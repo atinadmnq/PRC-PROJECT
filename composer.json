@@ -1,0 +1,17 @@
+{
+    "name": "atina/prc-project",
+    "autoload": {
+        "psr-4": {
+            "Atina\\PrcProject\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Atheena",
+            "email": "calayanatheena@gmail.com"
+        }
+    ],
+    "require": {
+        "phpoffice/phpspreadsheet": "^4.3"
+    }
+}
