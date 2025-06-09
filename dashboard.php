@@ -120,9 +120,7 @@ try {
                 <li class="nav-item"><button class="nav-link" data-section="users" style="position: relative;"><i class="fas fa-users"></i>Users<?php if (count($pending_requests) > 0): ?><span class="notification-badge"><?php echo count($pending_requests); ?></span><?php endif; ?></button></li>
                 <li class="nav-item"><button class="nav-link" data-section="register"><i class="fas fa-user-plus"></i>Register User</button></li>
                 <li class="nav-item"><button class="nav-link" data-section="activity"><i class="fas fa-history"></i>Activity Log</button></li>
-                <li class="nav-item"><a href="release.php" class="nav-link"><i class="fas fa-plus-circle"></i>Add Release</a></li>
                 <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload Files</a></li>
-                <li class="nav-item"><a href="addprofession.php" class="nav-link"><i class="fas fa-plus-square"></i>Add Profession</a></li>
                 <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>
@@ -178,9 +176,8 @@ try {
                         <div class="card-header bg-transparent"><h5 class="card-title mb-0"><i class="fas fa-chart-pie me-2"></i>Quick Actions</h5></div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
-                                <a href="release.php" class="btn btn-primary"><i class="fas fa-plus me-2"></i>Create New Release</a>
-                                <a href="upload.php" class="btn btn-outline-primary"><i class="fas fa-upload me-2"></i>Upload Files</a>
-                                <button class="btn btn-outline-secondary"><i class="fas fa-download me-2"></i>Export Data</button>
+                                <a href="uploadData_ui.php" class="btn btn-outline-primary"><i class="fas fa-upload me-2"></i>Upload Files</a>
+                                <a href="viewdata.php" class="btn btn-outline-secondary"><i class="fas fa-download me-2"></i>Export Data</a>
                                 <button class="btn btn-warning" data-section="users"><i class="fas fa-user-check me-2"></i>Review Requests (<?php echo count($pending_requests); ?>)</button>
                             </div>
                         </div>
