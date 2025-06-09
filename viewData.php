@@ -1,6 +1,23 @@
 <?php
 include 'db_connect.php';
 
+// Handle "Release" (Delete) action
+if (isset($_POST['release_id'])) {
+    $release_id = intval($_POST['release_id']);
+    
+    $stmt = $conn->prepare("DELETE FROM roravailable WHERE id = ?");
+    $stmt->bind_param("i", $release_id);
+    
+    if ($stmt->execute()) {
+        // Optional: add a message or redirect after successful delete
+        header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
+        exit;
+    } else {
+        echo "Error releasing record: " . $conn->error;
+    }
+    $stmt->close();
+}
+
 // Get all distinct examinations
 $sql = "SELECT DISTINCT examination FROM roravailable ORDER BY upload_timestamp DESC";
 $result = $conn->query($sql);
@@ -63,7 +80,7 @@ if ($exam !== '') {
         select, input[type=text] { padding: 8px; font-size: 16px; }
         select { width: 250px; }
         input[type=text] { width: 250px; }
-        button { padding: 8px 15px; font-size: 16px; }
+        button { padding: 8px 15px; font-size: 16px; cursor: pointer; }
         form { margin-bottom: 20px; }
         table { border-collapse: collapse; width: 100%; }
         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
@@ -112,6 +129,7 @@ if ($exam !== '') {
                     <th>Exam Date</th>
                     <th>Upload Timestamp</th>
                     <th>Status</th>
+                    <th>Action</th> 
                 </tr>
             </thead>
             <tbody>
@@ -123,6 +141,12 @@ if ($exam !== '') {
                         <td><?= htmlspecialchars($row['exam_date']) ?></td>
                         <td><?= htmlspecialchars(date("m-d-y h:m:s", strtotime($row['upload_timestamp']))) ?></td>
                         <td><?= htmlspecialchars($row['status']) ?></td>
+                        <td>
+                            <form method="post" action="" onsubmit="return confirm('Are you sure you want to release (delete) this record?');">
+                                <input type="hidden" name="release_id" value="<?= htmlspecialchars($row['id']) ?>">
+                                <button type="submit">Release</button>
+                            </form>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
