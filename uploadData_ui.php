@@ -2,23 +2,6 @@
 session_start();
 include 'db_connect.php';
 
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) { 
-    header("Location: index.php"); 
-    exit(); 
-}
-
-if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
-    $stmt = $pdo->prepare("SELECT full_name FROM users WHERE id = ?");
-    $stmt->execute([$_SESSION['user_id']]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($user) $_SESSION['full_name'] = $user['full_name'];
-}
-
-if (isset($_GET['logout'])) { 
-    session_destroy(); 
-    header("Location: index.php"); 
-    exit(); 
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
