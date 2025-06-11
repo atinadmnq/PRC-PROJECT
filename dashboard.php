@@ -121,6 +121,7 @@ try {
                 <li class="nav-item"><button class="nav-link" data-section="register"><i class="fas fa-user-plus"></i>Register User</button></li>
                 <li class="nav-item"><button class="nav-link" data-section="activity"><i class="fas fa-history"></i>Activity Log</button></li>
                 <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload Files</a></li>
+                <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-upload"></i>RTS Data</a></li>
                 <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>
