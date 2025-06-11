@@ -139,7 +139,7 @@ if ($exam !== '') {
                         <td><?= htmlspecialchars($row['name']) ?></td>
                         <td><?= htmlspecialchars($row['examination']) ?></td>
                         <td><?= htmlspecialchars($row['exam_date']) ?></td>
-                        <td><?= htmlspecialchars(date("m-d-y h:m:s", strtotime($row['upload_timestamp']))) ?></td>
+                        <td><?= htmlspecialchars(date("M-d-Y H:m:s", strtotime($row['upload_timestamp']))) ?></td>
                         <td><?= htmlspecialchars($row['status']) ?></td>
                         <td>
                             <form method="post" action="" onsubmit="return confirm('Are you sure you want to release (delete) this record?');">
