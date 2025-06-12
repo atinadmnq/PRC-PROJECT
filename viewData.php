@@ -76,9 +76,9 @@ if ($exam !== '') {
     <meta charset="UTF-8" />
     <title>View Uploaded ROR Data</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; }
-        select, input[type=text] { padding: 8px; font-size: 16px; }
-        select { width: 250px; }
+        body { font-family: "Century Gothic"; max-width: 900px; margin: 30px auto; }
+        select, input[type=text] { padding: 8px; font-size: 16px; font-family: "Century Gothic"}
+        select { width: 250px; font-family: "Century Gothic" }
         input[type=text] { width: 250px; }
         button { padding: 8px 15px; font-size: 16px; cursor: pointer; }
         form { margin-bottom: 20px; }
@@ -105,7 +105,7 @@ if ($exam !== '') {
     <form method="get" action="" id="filterForm">
         <label for="examSelect">Select Examination:</label>
         <select name="examination" id="examSelect" required onchange="document.getElementById('filterForm').submit()">
-            <option value="">-- Choose an examination --</option>
+            <option value="">Choose an examination</option>
             <?php foreach ($examinations as $examination): ?>
                 <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
                     <?= htmlspecialchars($examination) ?>
@@ -113,10 +113,10 @@ if ($exam !== '') {
             <?php endforeach; ?>
         </select>
 
-        <label for="searchName" style="margin-left:20px;">Search Name:</label>
-        <input type="text" id="searchName" name="search_name" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
-
-        <button type="submit" style="margin-left:10px;">Search</button>
+        <label for="searchName"; style=" margin-left:5px;">Search Name:</label>
+        <input type="text" id="searchName" name="search_name" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>"> 
+        
+        <button type="submit" style="margin-left:5px; font-family: Century Gothic;">Search</button>
     </form>
 
     <?php if (!empty($data)): ?>
@@ -144,7 +144,7 @@ if ($exam !== '') {
                         <td>
                             <form method="post" action="" onsubmit="return confirm('Are you sure you want to release (delete) this record?');">
                                 <input type="hidden" name="release_id" value="<?= htmlspecialchars($row['id']) ?>">
-                                <button type="submit">Release</button>
+                                <button type="submit" style="font-family: Century Gothic;">Release</button>
                             </form>
                         </td>
                     </tr>

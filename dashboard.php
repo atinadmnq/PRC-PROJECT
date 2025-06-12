@@ -99,6 +99,14 @@ try {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="dashboard.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: "Century Gothic";
+            margin: 0;
+            padding: 0;
+        }
+    </style>
 </head>
 <body>
     <div class="sidebar">
@@ -139,13 +147,13 @@ try {
         <!-- Dashboard Section -->
         <div id="dashboard" class="content-section active">
             <div class="page-header">
-                <h1 class="page-title"><i class="fas fa-tachometer-alt me-3"></i>Dashboard Overview</h1>
+                <h1 class="page-title"><i class="fas fa-tachometer-alt me-3" id="fonty"></i>Dashboard Overview</h1>
                 <p class="text-muted">Welcome to RILIS</p>
             </div>
             
             <div class="row mb-4">
-                <div class="col-md-3 mb-3"><div class="stats-card"><div class="mb-2"><i class="fas fa-file-alt fa-2x"></i></div><h3>0</h3><p class="mb-0">Total Releases</p></div></div>
-                <div class="col-md-3 mb-3"><div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"><div class="mb-2"><i class="fas fa-clock fa-2x"></i></div><h3>0</h3><p class="mb-0">Files Uploaded</p></div></div>
+                <div class="col-md-3 mb-3 "><div class="stats-card"><div class="mb-2"><i class="fas fa-file-alt fa-2x"></i></div><h3>0</h3><p class="mb-0 fonty">Total Releases</p></div></div>
+                <div class="col-md-3 mb-3"><div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"><div class="mb-2"><i class="fas fa-clock fa-2x"></i></div><h3>0</h3><p class="mb-0 fonty">Files Uploaded</p></div></div>
                 <div class="col-md-3 mb-3"><div class="stats-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"><div class="mb-2"><i class="fas fa-user-clock fa-2x"></i></div><h3><?php echo count($pending_requests); ?></h3><p class="mb-0">Pending Requests</p></div></div>
                 <div class="col-md-3 mb-3"><div class="stats-card" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333;"><div class="mb-2"><i class="fas fa-users fa-2x"></i></div><h3>5</h3><p class="mb-0">Active Staff</p></div></div>
             </div>

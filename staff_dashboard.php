@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_permission'])
     <style>
         body {
             background: #f8f9fa;
-            font-family: 'Inter', sans-serif;
+            font-family: "Century Gothic";
             margin: 0;
             padding: 0;
         }

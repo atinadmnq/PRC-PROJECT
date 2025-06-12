@@ -15,7 +15,7 @@ include 'db_connect.php';
     <style>
         body {
             background: #f8f9fa;
-            font-family: 'Inter', sans-serif;
+            font-family: "Century Gothic";
             margin: 0;
             padding: 0;
         }

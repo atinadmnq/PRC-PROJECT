@@ -15,7 +15,7 @@ include 'db_connect.php';
     <style>
         body {
             background: #f8f9fa;
-            font-family: 'Inter', sans-serif;
+            font-family: "Century Gothic", sans-serif;
             margin: 0;
             padding: 0;
         }
@@ -257,7 +257,7 @@ include 'db_connect.php';
                     <li class="nav-item"><a href="dashboard.php#register" class="nav-link"><i class="fas fa-user-plus"></i>Register User</a></li>
                     <li class="nav-item"><a href="dashboard.php#activity" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
                 <?php endif; ?>
-                <li class="nav-item"><a href="uploadData_ui.php" class="nav-link active"><i class="fas fa-upload"></i>Upload Files</a></li>
+                <li class="nav-item"><a href="rts_ui.php" class="nav-link active"><i class="fas fa-upload"></i>Upload Files</a></li>
                 <li class="nav-item"><a href="rtsTableView.php" class="nav-link"><i class="fas fa-eye"></i>View Records</a></li>
                 <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
