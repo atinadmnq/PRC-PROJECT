@@ -130,6 +130,7 @@ try {
                 <li class="nav-item"><button class="nav-link" data-section="activity"><i class="fas fa-history"></i>Activity Log</button></li>
                 <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload Files</a></li>
                 <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-upload"></i>RTS Data</a></li>
+                <li class="nav-item"><a href="rtsTableView.php" class="nav-link active"><i class="fas fa-table"></i>View RTS Data</a></li>
                 <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>

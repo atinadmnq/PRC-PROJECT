@@ -1,3 +1,4 @@
+<!-- rts_ui.php-->
 <?php
 session_start();
 include 'db_connect.php';
@@ -15,7 +16,7 @@ include 'db_connect.php';
     <style>
         body {
             background: #f8f9fa;
-            font-family: "Century Gothic", sans-serif;
+            font-family: "Century Gothic";
             margin: 0;
             padding: 0;
         }
@@ -29,28 +30,31 @@ include 'db_connect.php';
             background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
             color: white;
             z-index: 1000;
+            transition: all 0.3s ease;
         }
-
+        
         .sidebar-header {
             padding: 20px;
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
-
+        
         .sidebar-brand {
             font-size: 1.5rem;
             font-weight: 700;
             text-decoration: none;
             color: white;
         }
-
-        .sidebar-brand:hover { color: white; }
-
+        
+        .sidebar-brand:hover {
+            color: white;
+        }
+        
         .user-info {
             padding: 20px;
             border-bottom: 1px solid rgba(255,255,255,0.1);
             text-align: center;
         }
-
+        
         .user-avatar {
             width: 60px;
             height: 60px;
@@ -62,10 +66,15 @@ include 'db_connect.php';
             margin: 0 auto 10px;
             font-size: 1.5rem;
         }
-
-        .nav-menu { padding: 20px 0; }
-        .nav-item { margin-bottom: 5px; }
-
+        
+        .nav-menu {
+            padding: 20px 0;
+        }
+        
+        .nav-item {
+            margin-bottom: 5px;
+        }
+        
         .nav-link {
             color: rgba(255,255,255,0.8);
             padding: 12px 20px;
@@ -73,19 +82,23 @@ include 'db_connect.php';
             display: flex;
             align-items: center;
             transition: all 0.3s ease;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
         }
-
+        
         .nav-link:hover {
             background: rgba(255,255,255,0.1);
             color: white;
         }
-
+        
         .nav-link.active {
             background: rgba(255,255,255,0.2);
             color: white;
             border-right: 3px solid white;
         }
-
+        
         .nav-link i {
             width: 20px;
             margin-right: 10px;
@@ -97,6 +110,24 @@ include 'db_connect.php';
             padding: 30px;
         }
 
+        .page-header {
+            margin-bottom: 30px;
+        }
+        
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .dashboard-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: none;
+            margin-bottom: 20px;
+        }
+
         .upload-container {
             background: white;
             padding: 40px;
@@ -104,17 +135,6 @@ include 'db_connect.php';
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             max-width: 800px;
             margin: 0 auto;
-        }
-
-        .page-header {
-            margin-bottom: 30px;
-            text-align: center;
-        }
-
-        .page-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2c3e50;
         }
 
         .page-subtitle {
@@ -230,8 +250,17 @@ include 'db_connect.php';
         }
 
         @media (max-width: 768px) {
-            .sidebar { display: none; }
-            .main-content { margin-left: 0; padding: 20px; }
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
         }
     </style>
 </head>
@@ -246,7 +275,7 @@ include 'db_connect.php';
         <div class="user-info">
             <div class="user-avatar"><i class="fas fa-user"></i></div>
             <div class="user-name"><?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['email'] ?? 'User'); ?></div>
-            <small class="text-light"><?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?></small><br>
+            <small class="text-light"><?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?></small>
             <small class="text-light"><?php echo ucfirst($_SESSION['role'] ?? 'User'); ?></small>
         </div>
         <nav class="nav-menu">
@@ -257,20 +286,21 @@ include 'db_connect.php';
                     <li class="nav-item"><a href="dashboard.php#register" class="nav-link"><i class="fas fa-user-plus"></i>Register User</a></li>
                     <li class="nav-item"><a href="dashboard.php#activity" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
                 <?php endif; ?>
-                <li class="nav-item"><a href="rts_ui.php" class="nav-link active"><i class="fas fa-upload"></i>Upload Files</a></li>
-                <li class="nav-item"><a href="rtsTableView.php" class="nav-link"><i class="fas fa-eye"></i>View Records</a></li>
+                <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload Files</a></li>
+                <li class="nav-item"><a href="rts_ui.php" class="nav-link active"><i class="fas fa-upload"></i>RTS Data</a></li>
+                <li class="nav-item"><a href="rtsTableView.php" class="nav-link active"><i class="fas fa-table"></i>View RTS Data</a></li>
                 <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>
     </div>
 
     <div class="main-content">
-        <div class="upload-container">
-            <div class="page-header">
-                <h1 class="page-title">Upload RTS Excel File</h1>
-                <p class="page-subtitle">Upload the "Return To Sender" Excel file to the system</p>
-            </div>
+        <div class="page-header">
+            <h1 class="page-title"><i class="fas fa-upload me-3"></i>Upload RTS Excel File</h1>
+            <p class="text-muted">Upload the "Return To Sender" Excel file to the system</p>
+        </div>
 
+        <div class="upload-container dashboard-card">
             <?php if (isset($_SESSION["message"])): ?>
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle me-2"></i>

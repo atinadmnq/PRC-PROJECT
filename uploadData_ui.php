@@ -1,3 +1,4 @@
+<!-- uploadData_ui.php -->
 <?php
 session_start();
 include 'db_connect.php';
@@ -29,6 +30,7 @@ include 'db_connect.php';
             background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
             color: white;
             z-index: 1000;
+            transition: all 0.3s ease;
         }
 
         .sidebar-header {
@@ -43,7 +45,9 @@ include 'db_connect.php';
             color: white;
         }
 
-        .sidebar-brand:hover { color: white; }
+        .sidebar-brand:hover {
+            color: white;
+        }
 
         .user-info {
             padding: 20px;
@@ -63,8 +67,13 @@ include 'db_connect.php';
             font-size: 1.5rem;
         }
 
-        .nav-menu { padding: 20px 0; }
-        .nav-item { margin-bottom: 5px; }
+        .nav-menu {
+            padding: 20px 0;
+        }
+
+        .nav-item {
+            margin-bottom: 5px;
+        }
 
         .nav-link {
             color: rgba(255,255,255,0.8);
@@ -73,6 +82,10 @@ include 'db_connect.php';
             display: flex;
             align-items: center;
             transition: all 0.3s ease;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
         }
 
         .nav-link:hover {
@@ -97,6 +110,24 @@ include 'db_connect.php';
             padding: 30px;
         }
 
+        .page-header {
+            margin-bottom: 30px;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .dashboard-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: none;
+            margin-bottom: 20px;
+        }
+
         .upload-container {
             background: white;
             padding: 40px;
@@ -104,17 +135,6 @@ include 'db_connect.php';
             box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             max-width: 800px;
             margin: 0 auto;
-        }
-
-        .page-header {
-            margin-bottom: 30px;
-            text-align: center;
-        }
-
-        .page-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2c3e50;
         }
 
         .page-subtitle {
@@ -202,11 +222,13 @@ include 'db_connect.php';
             margin-top: 20px;
             text-align: center;
             display: inline-block;
+            text-decoration: none;
         }
 
         .view-records-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 20px rgba(40, 167, 69, 0.3);
+            color: white;
         }
 
         .alert {
@@ -230,8 +252,17 @@ include 'db_connect.php';
         }
 
         @media (max-width: 768px) {
-            .sidebar { display: none; }
-            .main-content { margin-left: 0; padding: 20px; }
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
         }
     </style>
 </head>
@@ -246,7 +277,7 @@ include 'db_connect.php';
         <div class="user-info">
             <div class="user-avatar"><i class="fas fa-user"></i></div>
             <div class="user-name"><?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['email'] ?? 'User'); ?></div>
-            <small class="text-light"><?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?></small><br>
+            <small class="text-light"><?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?></small>
             <small class="text-light"><?php echo ucfirst($_SESSION['role'] ?? 'User'); ?></small>
         </div>
         <nav class="nav-menu">
@@ -258,64 +289,71 @@ include 'db_connect.php';
                     <li class="nav-item"><a href="dashboard.php#activity" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
                 <?php endif; ?>
                 <li class="nav-item"><a href="uploadData_ui.php" class="nav-link active"><i class="fas fa-upload"></i>Upload Files</a></li>
-                <li class="nav-item"><a href="viewData.php" class="nav-link"><i class="fas fa-eye"></i>View Records</a></li>
+                <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-upload"></i>RTS Data</a></li>
+                <li class="nav-item"><a href="rtsTableView.php" class="nav-link active"><i class="fas fa-table"></i>View RTS Data</a></li>
                 <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>
     </div>
 
     <div class="main-content">
-        <div class="upload-container">
-            <div class="page-header">
-                <h1 class="page-title">Upload ROR Excel File</h1>
-                <p class="page-subtitle">Upload your Roll of Registrants Excel file to the system</p>
+        <div class="page-header">
+            <h1 class="page-title"><i class="fas fa-upload me-3"></i>Upload ROR Excel File</h1>
+            <p class="text-muted">Upload your Roll of Registrants Excel file to the system</p>
+        </div>
+
+        <?php if (isset($_SESSION["message"])): ?>
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle me-2"></i>
+                <?php echo $_SESSION["message"]; unset($_SESSION["message"]); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
+        <?php endif; ?>
 
-            <?php if (isset($_SESSION["message"])): ?>
-                <div class="alert alert-success">
-                    <i class="fas fa-check-circle me-2"></i>
-                    <?php echo $_SESSION["message"]; unset($_SESSION["message"]); ?>
-                </div>
-            <?php endif; ?>
-
-            <?php if (isset($_SESSION["error"])): ?>
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    <?php echo $_SESSION["error"]; unset($_SESSION["error"]); ?>
-                </div>
-            <?php endif; ?>
-
-            <!-- Horizontal Upload Form -->
-            <form id="uploadForm" action="upload_data.php" method="POST" enctype="multipart/form-data" class="upload-form d-flex gap-3 align-items-end">
-                <div class="flex-grow-1">
-                    <label for="excel_file" class="form-label d-block">
-                        <i class="fas fa-file-excel"></i>
-                        Select Excel File (.xlsx or .xls)
-                    </label>
-                    <input type="file" name="excel_file" id="excel_file" class="form-control" accept=".xlsx,.xls" required>
-                </div>
-                <div style="min-width: 160px;">
-                    <button type="submit" class="upload-btn">
-                        <i class="fas fa-upload"></i> Upload
-                    </button>
-                </div>
-            </form>
-
-            <div class="requirements-card">
-                <h5 class="requirements-title"><i class="fas fa-info-circle"></i> File Format Requirements</h5>
-                <p class="text-muted">Please make sure the file matches the required format:</p>
-                <ul class="requirements-list">
-                    <li><i class="fas fa-check-circle"></i>NO.</li>
-                    <li><i class="fas fa-check-circle"></i>NAME</li>
-                    <li><i class="fas fa-check-circle"></i>EXAMINATION</li>
-                    <li><i class="fas fa-check-circle"></i>EXAM DATE</li>
-                </ul>
+        <?php if (isset($_SESSION["error"])): ?>
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <?php echo $_SESSION["error"]; unset($_SESSION["error"]); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
+        <?php endif; ?>
 
-            <a href="viewData.php" class="view-records-btn mt-4">
-                <i class="fas fa-eye me-2"></i>
-                View Records
-            </a>
+        <div class="card dashboard-card">
+            <div class="card-body">
+                <div class="upload-container">
+                    <!-- Horizontal Upload Form -->
+                    <form id="uploadForm" action="upload_data.php" method="POST" enctype="multipart/form-data" class="upload-form d-flex gap-3 align-items-end">
+                        <div class="flex-grow-1">
+                            <label for="excel_file" class="form-label d-block">
+                                <i class="fas fa-file-excel"></i>
+                                Select Excel File (.xlsx or .xls)
+                            </label>
+                            <input type="file" name="excel_file" id="excel_file" class="form-control" accept=".xlsx,.xls" required>
+                        </div>
+                        <div style="min-width: 160px;">
+                            <button type="submit" class="upload-btn">
+                                <i class="fas fa-upload"></i> Upload
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="requirements-card">
+                        <h5 class="requirements-title"><i class="fas fa-info-circle"></i> File Format Requirements</h5>
+                        <p class="text-muted">Please make sure the file matches the required format:</p>
+                        <ul class="requirements-list">
+                            <li><i class="fas fa-check-circle"></i>NO.</li>
+                            <li><i class="fas fa-check-circle"></i>NAME</li>
+                            <li><i class="fas fa-check-circle"></i>EXAMINATION</li>
+                            <li><i class="fas fa-check-circle"></i>EXAM DATE</li>
+                        </ul>
+                    </div>
+
+                    <a href="viewData.php" class="view-records-btn mt-4">
+                        <i class="fas fa-eye me-2"></i>
+                        View Records
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 
