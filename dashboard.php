@@ -128,9 +128,8 @@ try {
                 <li class="nav-item"><button class="nav-link" data-section="users" style="position: relative;"><i class="fas fa-users"></i>Users<?php if (count($pending_requests) > 0): ?><span class="notification-badge"><?php echo count($pending_requests); ?></span><?php endif; ?></button></li>
                 <li class="nav-item"><button class="nav-link" data-section="register"><i class="fas fa-user-plus"></i>Register User</button></li>
                 <li class="nav-item"><button class="nav-link" data-section="activity"><i class="fas fa-history"></i>Activity Log</button></li>
-                <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload Files</a></li>
-                <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-upload"></i>RTS Data</a></li>
-                <li class="nav-item"><a href="rtsTableView.php" class="nav-link active"><i class="fas fa-table"></i>View RTS Data</a></li>
+                <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload ROR Data</a></li>
+                <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload RTS Data</a></li>
                 <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>
