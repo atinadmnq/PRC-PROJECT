@@ -1,4 +1,33 @@
+<!-- uploadData_ui.php -->
 <?php
+session_start();
+
+// Database connection
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'prc_release_db');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+
+try {
+    $pdo = new PDO("mysql:host=".DB_HOST.";dbname=".DB_NAME, DB_USER, DB_PASS);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
+}
+
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) { 
+    header("Location: index.php"); 
+    exit(); 
+}
+
+// Get user's full name
+if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
+    $stmt = $pdo->prepare("SELECT full_name FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($user) $_SESSION['full_name'] = $user['full_name'];
+}
+
 include 'db_connect.php';
 
 // Handle "Release" (Delete) action
@@ -321,8 +350,9 @@ if ($exam !== '') {
         </div>
         <div class="user-info">
             <div class="user-avatar"><i class="fas fa-user"></i></div>
-            <div class="user-name">Administrator</div>
-            <small class="text-light">RTS Data Manager</small>
+            <div class="user-name"><?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['email'] ?? 'User'); ?></div>
+            <small class="text-light"><?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?></small>
+            <small class="text-light">Administrator</small>
         </div>
         <nav class="nav-menu">
             <ul class="list-unstyled">

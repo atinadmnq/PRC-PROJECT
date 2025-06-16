@@ -3,6 +3,34 @@
 session_start();
 include 'db_connect.php';
 
+// Database connection
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'prc_release_db');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+
+try {
+    $pdo = new PDO("mysql:host=".DB_HOST.";dbname=".DB_NAME, DB_USER, DB_PASS);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
+}
+
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) { 
+    header("Location: index.php"); 
+    exit(); 
+}
+
+// Get user's full name
+if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
+    $stmt = $pdo->prepare("SELECT full_name FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($user) $_SESSION['full_name'] = $user['full_name'];
+}
+
+if (isset($_GET['logout'])) { session_destroy(); header("Location: index.php"); exit(); }
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -276,7 +304,7 @@ include 'db_connect.php';
             <div class="user-avatar"><i class="fas fa-user"></i></div>
             <div class="user-name"><?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['email'] ?? 'User'); ?></div>
             <small class="text-light"><?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?></small>
-            <small class="text-light"><?php echo ucfirst($_SESSION['role'] ?? 'User'); ?></small>
+            <small class="text-light">Administrator</small>
         </div>
         <nav class="nav-menu">
             <ul class="list-unstyled">
@@ -286,8 +314,9 @@ include 'db_connect.php';
                     <li class="nav-item"><a href="dashboard.php#register" class="nav-link"><i class="fas fa-user-plus"></i>Register User</a></li>
                     <li class="nav-item"><a href="dashboard.php#activity" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
                 <?php endif; ?>
-                <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload ROR Data</a></li>
-                <li class="nav-item"><a href="rts_ui.php" class="nav-link active"><i class="fas fa-upload"></i>Upload RTS Data</a></li>
+                <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload Files</a></li>
+                <li class="nav-item"><a href="rts_ui.php" class="nav-link active"><i class="fas fa-upload"></i>RTS Data</a></li>
+                <li class="nav-item"><a href="rtsTableView.php" class="nav-link active"><i class="fas fa-table"></i>View RTS Data</a></li>
                 <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>
