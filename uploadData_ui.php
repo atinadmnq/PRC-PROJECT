@@ -99,237 +99,9 @@ if ($exam !== '') {
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body {
-            background: #f8f9fa;
-            font-family: "Century Gothic";
-            margin: 0;
-            padding: 0;
-        }
-
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            width: 280px;
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
-            color: white;
-            z-index: 1000;
-            transition: all 0.3s ease;
-        }
-        
-        .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .sidebar-brand {
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-decoration: none;
-            color: white;
-        }
-        
-        .sidebar-brand:hover {
-            color: white;
-        }
-        
-        .user-info {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-        
-        .user-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 10px;
-            font-size: 1.5rem;
-        }
-        
-        .nav-menu {
-            padding: 20px 0;
-        }
-        
-        .nav-item {
-            margin-bottom: 5px;
-        }
-        
-        .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 12px 20px;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            width: 100%;
-            text-align: left;
-        }
-        
-        .nav-link:hover {
-            background: rgba(255,255,255,0.1);
-            color: white;
-        }
-        
-        .nav-link.active {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border-right: 3px solid white;
-        }
-        
-        .nav-link i {
-            width: 20px;
-            margin-right: 10px;
-        }
-        
-        .main-content {
-            margin-left: 280px;
-            min-height: 100vh;
-            padding: 30px;
-        }
-        
-        .dashboard-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border: none;
-            margin-bottom: 20px;
-        }
-        
-        .page-header {
-            margin-bottom: 30px;
-        }
-        
-        .page-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2c3e50;
-        }
-
-        .summary-card {
-            background: linear-gradient(135deg,rgb(59, 82, 182) 0%,rgb(75, 120, 162) 100%);
-            color: white;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 30px;
-        }
-
-        .filter-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-            padding: 25px;
-            margin-bottom: 30px;
-        }
-
-        .form-control, .form-select {
-            border-radius: 10px;
-            border: 2px solid #e9ecef;
-            padding: 12px 15px;
-            font-family: "Century Gothic";
-        }
-
-        .form-control:focus, .form-select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 10px;
-            padding: 12px 25px;
-            font-family: "Century Gothic";
-            font-weight: 600;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
-            transform: translateY(-1px);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            border: none;
-            border-radius: 8px;
-            padding: 8px 15px;
-            font-family: "Century Gothic";
-            font-size: 14px;
-        }
-
-        .btn-danger:hover {
-            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-            transform: translateY(-1px);
-        }
-
-        .table {
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-        }
-
-        .table th {
-            background: linear-gradient(135deg,rgb(26, 43, 121) 0%,rgb(42, 96, 184) 100%);
-            color: white;
-            border: none;
-            padding: 15px;
-            font-weight: 600;
-            font-family: "Century Gothic";
-        }
-
-        .table td {
-            padding: 15px;
-            border-color: #e9ecef;
-            font-family: "Century Gothic";
-        }
-
-        .table tbody tr:hover {
-            background-color: #f8f9fa;
-        }
-
-        .exam-count-item {
-            background: rgba(255,255,255,0.1);
-            border-radius: 8px;
-            padding: 10px 15px;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .exam-count-name {
-            font-weight: 600;
-        }
-
-        .exam-count-number {
-            background: rgba(255,255,255,0.2);
-            border-radius: 20px;
-            padding: 4px 12px;
-            font-weight: 700;
-        }
-
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-            
-            .sidebar.mobile-open {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 0;
-            }
-        }
-    </style>
+    <link href="css/uploadData_ui.css" rel="stylesheet">
+    
+    
 </head>
 <body>
     <div class="sidebar">
@@ -366,26 +138,26 @@ if ($exam !== '') {
 
         <!-- Summary Card -->
         <div class="summary-card">
-            <h4 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Data Summary</h4>
+            <h4 class="mb-4"><i class="fas fa-chart-bar me-2"></i>Data Summary</h4>
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="text-center">
-                        <h2 class="mb-0"><?= $total_count ?></h2>
+                        <h2 class="mb-1"><?= $total_count ?></h2>
                         <p class="mb-0">Total Records</p>
                     </div>
                 </div>
-                <div class="col-md-8">
+                <div class="col-md-9">
                     <h6 class="mb-3">Records by Examination:</h6>
-                    <div class="row">
+                    <?php if (!empty($exam_counts)): ?>
                         <?php foreach ($exam_counts as $exam_name => $count): ?>
-                            <div class="col-md-6 mb-2">
-                                <div class="exam-count-item">
-                                    <span class="exam-count-name"><?= htmlspecialchars($exam_name) ?></span>
-                                    <span class="exam-count-number"><?= $count ?></span>
-                                </div>
+                            <div class="exam-count-item">
+                                <span class="exam-count-name"><?= htmlspecialchars($exam_name) ?></span>
+                                <span class="exam-count-number"><?= $count ?></span>
                             </div>
                         <?php endforeach; ?>
-                    </div>
+                    <?php else: ?>
+                        <p class="text-light mb-0"><i class="fas fa-info-circle me-1"></i>No examination data available</p>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
