@@ -1,0 +1,470 @@
+<?php
+session_start();
+
+// Database connection
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'prc_release_db');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+
+try {
+    $pdo = new PDO("mysql:host=".DB_HOST.";dbname=".DB_NAME, DB_USER, DB_PASS);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
+}
+
+// Check if user is logged in as staff
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header("Location: index.php");
+    exit();
+}
+
+// Get user's full name if not already set
+if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
+    $stmt = $pdo->prepare("SELECT full_name FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($user) $_SESSION['full_name'] = $user['full_name'];
+}
+
+// Include or define the logActivity function
+function logActivity($username, $action, $details = '') {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("INSERT INTO activity_log (username, action, details, timestamp) VALUES (?, ?, ?, NOW())");
+        $stmt->execute([$username, $action, $details]);
+    } catch (PDOException $e) {
+        error_log("Activity logging failed: " . $e->getMessage());
+    }
+}
+
+// Log the RTS table view access
+logActivity($_SESSION['account_name'] ?? $_SESSION['email'], 'rts_table_view_access', 'Staff accessed RTS table view');
+
+// Get all distinct examinations
+$sql = "SELECT DISTINCT examination FROM rts_data_onhold ORDER BY upload_timestamp DESC";
+$result = $pdo->query($sql);
+
+$examinations = [];
+if ($result) {
+    while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
+        $examinations[] = $row['examination'];
+    }
+}
+
+// Get count per examination
+$sql_counts = "SELECT examination, COUNT(*) as count FROM rts_data_onhold GROUP BY examination";
+$result_counts = $pdo->query($sql_counts);
+
+$exam_counts = [];
+$total_count = 0;
+
+if ($result_counts) {
+    while ($row = $result_counts->fetch(PDO::FETCH_ASSOC)) {
+        $exam_counts[$row['examination']] = $row['count'];
+        $total_count += $row['count'];
+    }
+}
+
+// Read GET parameters safely
+$exam = isset($_GET['examination']) ? trim($_GET['examination']) : '';
+$search_name = isset($_GET['search_name']) ? trim($_GET['search_name']) : '';
+
+// If examination selected, fetch its data with optional name filter
+$data = [];
+if ($exam !== '') {
+    $sql_data = "SELECT id, name, examination, exam_date, upload_timestamp, status 
+                 FROM rts_data_onhold 
+                 WHERE LOWER(examination) = LOWER(?)";
+    $params = [$exam];
+
+    if ($search_name !== '') {
+        $sql_data .= " AND name LIKE ?";
+        $params[] = '%' . $search_name . '%';
+    }
+
+    $sql_data .= " ORDER BY upload_timestamp DESC";
+
+    $stmt = $pdo->prepare($sql_data);
+    $stmt->execute($params);
+    $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTS Table View - RILIS Staff</title>
+    <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: "Century Gothic";
+            margin: 0;
+            padding: 0;
+        }
+        
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 280px;
+            background: linear-gradient(135deg, rgb(134, 65, 244) 0%, rgb(66, 165, 245) 100%);
+            color: white;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .sidebar-brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-decoration: none;
+            color: white;
+        }
+        
+        .sidebar-brand:hover {
+            color: white;
+        }
+        
+        .user-info {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+        
+        .user-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            font-size: 1.5rem;
+        }
+        
+        .nav-menu {
+            padding: 20px 0;
+        }
+        
+        .nav-item {
+            margin-bottom: 5px;
+        }
+        
+        .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 12px 20px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+        
+        .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+        
+        .nav-link.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border-right: 3px solid white;
+        }
+        
+        .nav-link i {
+            width: 20px;
+            margin-right: 10px;
+        }
+        
+        .main-content {
+            margin-left: 280px;
+            min-height: 100vh;
+            padding: 30px;
+        }
+        
+        .dashboard-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: none;
+            margin-bottom: 20px;
+        }
+        
+        .page-header {
+            margin-bottom: 30px;
+        }
+        
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .filter-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .form-control, .form-select {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            padding: 12px 15px;
+            font-family: "Century Gothic";
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 25px;
+            font-family: "Century Gothic";
+            font-weight: 600;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+            transform: translateY(-1px);
+        }
+
+        .table {
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+
+        .table th {
+            background: linear-gradient(135deg, rgb(134, 65, 244) 0%, rgb(66, 165, 245) 100%);
+            color: white;
+            border: none;
+            padding: 15px;
+            font-weight: 600;
+            font-family: "Century Gothic";
+        }
+
+        .table td {
+            padding: 15px;
+            border-color: #e9ecef;
+            font-family: "Century Gothic";
+        }
+
+        .table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .exam-count-item {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .exam-count-name {
+            font-weight: 600;
+        }
+
+        .exam-count-number {
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-weight: 700;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <a href="#" class="sidebar-brand">
+                <img src="img/rilis-logo.png" alt="RILIS" style="height: 35px; margin-right: 3px;">
+                RILIS
+            </a>
+        </div>
+        <div class="user-info">
+            <div class="user-avatar"><i class="fas fa-user"></i></div>
+            <div class="user-name"><?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['email'] ?? 'User'); ?></div>
+            <small class="text-light"><?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?></small>
+            <small class="text-light">Staff Member</small>
+        </div>
+        <nav class="nav-menu">
+            <ul class="list-unstyled">
+                <li class="nav-item"><a href="staff_dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
+                <li class="nav-item"><a href="staff_dashboard.php" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
+                <li class="nav-item"><a href="staff_dashboard.php" class="nav-link"><i class="fas fa-upload"></i>Request ROR Upload</a></li>
+                <li class="nav-item"><a href="staff_dashboard.php" class="nav-link"><i class="fas fa-upload"></i>Request RTS Upload</a></li>
+                <li class="nav-item"><a href="staff_rts_table_view.php" class="nav-link active"><i class="fas fa-table"></i>RTS Table View</a></li>
+                <li class="nav-item"><a href="staff_dashboard.php?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
+            </ul>
+        </nav>
+    </div>
+    
+    <div class="main-content">
+        <div class="page-header">
+            <h1 class="page-title"><i class="fas fa-table me-3"></i>RTS Table View</h1>
+            <p class="text-muted">View uploaded RTS examination data</p>
+        </div>
+
+        <!-- Summary Card -->
+        <div class="summary-card">
+            <h4 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Data Summary</h4>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="text-center">
+                        <h2 class="mb-0"><?= $total_count ?></h2>
+                        <p class="mb-0">Total Records</p>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <h6 class="mb-3">Records by Examination:</h6>
+                    <div class="row">
+                        <?php foreach ($exam_counts as $exam_name => $count): ?>
+                            <div class="col-md-6 mb-2">
+                                <div class="exam-count-item">
+                                    <span class="exam-count-name"><?= htmlspecialchars($exam_name) ?></span>
+                                    <span class="exam-count-number"><?= $count ?></span>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Card -->
+        <div class="filter-card">
+            <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
+            <form method="get" action="" id="filterForm">
+                <div class="row align-items-end">
+                    <div class="col-md-4">
+                        <label for="examSelect" class="form-label"><i class="fas fa-graduation-cap me-1"></i>Select Examination</label>
+                        <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
+                            <option value="">-- Choose an examination --</option>
+                            <?php foreach ($examinations as $examination): ?>
+                                <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($examination) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="searchName" class="form-label"><i class="fas fa-search me-1"></i>Search Name</label>
+                        <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-2"></i>Search</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Data Table -->
+        <?php if (!empty($data)): ?>
+            <div class="dashboard-card">
+                <div class="card-header bg-transparent">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-list me-2"></i>RTS Data for: <?= htmlspecialchars($exam) ?>
+                        <span class="badge bg-primary ms-2"><?= count($data) ?> records</span>
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th><i class="fas fa-hashtag me-1"></i>ID</th>
+                                    <th><i class="fas fa-user me-1"></i>Name</th>
+                                    <th><i class="fas fa-graduation-cap me-1"></i>Examination</th>
+                                    <th><i class="fas fa-calendar me-1"></i>Exam Date</th>
+                                    <th><i class="fas fa-clock me-1"></i>Upload Timestamp</th>
+                                    <th><i class="fas fa-info-circle me-1"></i>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($data as $row): ?>
+                                    <tr>
+                                        <td><strong><?= htmlspecialchars($row['id']) ?></strong></td>
+                                        <td><?= htmlspecialchars($row['name']) ?></td>
+                                        <td>
+                                            <span class="badge bg-info"><?= htmlspecialchars($row['examination']) ?></span>
+                                        </td>
+                                        <td><?= htmlspecialchars($row['exam_date']) ?></td>
+                                        <td>
+                                            <small class="text-muted">
+                                                <?= htmlspecialchars(date("M d, Y", strtotime($row['upload_timestamp']))) ?><br>
+                                                <?= htmlspecialchars(date("h:i A", strtotime($row['upload_timestamp']))) ?>
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-warning"><?= htmlspecialchars($row['status']) ?></span>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        <?php elseif ($exam !== ''): ?>
+            <div class="dashboard-card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-search fa-4x text-muted mb-3"></i>
+                    <h5 class="text-muted">No Records Found</h5>
+                    <p class="text-muted">No records found for examination: <strong><?= htmlspecialchars($exam) ?></strong></p>
+                    <?php if ($search_name !== ''): ?>
+                        <p class="text-muted">with name containing: <strong><?= htmlspecialchars($search_name) ?></strong></p>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
