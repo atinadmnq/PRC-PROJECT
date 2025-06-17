@@ -36,49 +36,35 @@ if (isset($_GET['logout'])) { session_destroy(); header("Location: index.php"); 
 
 // Handle permission requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_permission'])) {
-    // Verify CSRF token
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        $_SESSION['error_message'] = "Invalid request. Please try again.";
-    } else {
-        $action = $_POST['action'];
-        $reason = 'Permission requested by staff member'; // Default reason
-        
-        try {
-            $stmt = $pdo->prepare("INSERT INTO permission_requests (user_id, user_name, request_type, reason, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())");
-            $stmt->execute([
-                $_SESSION['user_id'],
-                $_SESSION['full_name'] ?? $_SESSION['email'],
-                $action,
-                $reason
-            ]);
-            
-            $_SESSION['permission_requested'] = true;
-            $_SESSION['request_message'] = "Your " . strtoupper($action) . " upload permission request has been submitted successfully!";
-            
-            // Log the activity
-            $log_stmt = $pdo->prepare("INSERT INTO activity_log (user_id, user_name, action, description, created_at) VALUES (?, ?, 'request', ?, NOW())");
-            $log_stmt->execute([
-                $_SESSION['user_id'],
-                $_SESSION['full_name'] ?? $_SESSION['email'],
-                "Requested " . strtoupper($action) . " upload permission"
-            ]);
-            
-        } catch (PDOException $e) {
-            $_SESSION['error_message'] = "Failed to submit request. Please try again.";
-        }
-    }
+    $action = $_POST['action']; // 'upload' for ROR or 'rts_upload' for RTS
+    $reason = trim($_POST['reason']);
+    $user_email = $_SESSION['email'] ?? '';
     
-    // Redirect to prevent form resubmission
-    header("Location: " . $_SERVER['PHP_SELF']);
-    exit();
+    if (!empty($reason) && !empty($action)) {
+        // Check if user already has a pending request for this action
+        $stmt = $pdo->prepare("SELECT id FROM permission_requests WHERE email = ? AND action = ? AND status = 'pending'");
+        $stmt->execute([$user_email, $action]);
+        
+        if ($stmt->rowCount() == 0) {
+            // Insert new permission request
+            $stmt = $pdo->prepare("INSERT INTO permission_requests (email, action, reason, status, created_at) VALUES (?, ?, ?, 'pending', NOW())");
+            if ($stmt->execute([$user_email, $action, $reason])) {
+                $_SESSION['permission_requested'] = true;
+                $_SESSION['request_message'] = "Permission request submitted successfully! Admin will review your request.";
+            } else {
+                $_SESSION['error_message'] = "Failed to submit request. Please try again.";
+            }
+        } else {
+            $_SESSION['error_message'] = "You already have a pending request for this action.";
+        }
+    } else {
+        $_SESSION['error_message'] = "Please provide a reason for your request.";
+    }
 }
 
-// Handle registration (if admin)
+// Handle registration
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_user'])) {
-    $full_name = trim($_POST['full_name']); 
-    $email = trim($_POST['email']); 
-    $password = $_POST['password']; 
-    $role = $_POST['role'];
+    $full_name = trim($_POST['full_name']); $email = trim($_POST['email']); $password = $_POST['password']; $role = $_POST['role'];
     
     if (!empty($full_name) && !empty($email) && !empty($password) && !empty($role)) {
         $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
@@ -96,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_user'])) {
     }
 }
 
-// Handle approve/reject requests (if admin)
+// Handle approve/reject requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['approve_request']) || isset($_POST['reject_request']))) {
     $request_id = $_POST['request_id'];
     $action = isset($_POST['approve_request']) ? 'approved' : 'rejected';
@@ -109,9 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['approve_request']) |
 // Fetch data
 $pending_requests = $pdo->query("SELECT * FROM permission_requests WHERE status = 'pending' ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Fixed activity logs query - check what columns actually exist in your activity_log table
+// Fixed activity logs query
 try {
-    // First, let's try with a safer query that handles missing columns
     $activity_logs = $pdo->query("
         SELECT 
             al.*,
@@ -121,10 +106,8 @@ try {
         LIMIT 50
     ")->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    // Fallback query in case the above doesn't work
     try {
         $activity_logs = $pdo->query("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
-        // Add full_name field if it doesn't exist
         foreach ($activity_logs as &$log) {
             if (!isset($log['full_name'])) {
                 $log['full_name'] = $log['user_name'] ?? $log['account_name'] ?? 'Unknown User';
@@ -134,6 +117,26 @@ try {
         $activity_logs = [];
         error_log("Activity log query failed: " . $e2->getMessage());
     }
+}
+
+// Function to check user permissions 
+function hasPermission($pdo, $user_email, $permission_type) {
+    $stmt = $pdo->prepare("
+        SELECT id FROM user_permissions 
+        WHERE user_email = ? AND permission_type = ? AND status = 'active'
+    ");
+    $stmt->execute([$user_email, $permission_type]);
+    return $stmt->rowCount() > 0;
+}
+// 4. Function to get user's permissions (for display purposes)
+function getUserPermissions($pdo, $user_email) {
+    $stmt = $pdo->prepare("
+        SELECT permission_type, granted_at, granted_by 
+        FROM user_permissions 
+        WHERE user_email = ? AND status = 'active'
+    ");
+    $stmt->execute([$user_email]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
 <!DOCTYPE html>
@@ -145,211 +148,7 @@ try {
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  
-    <style>
-        body {
-            background: #f8f9fa;
-            font-family: "Century Gothic";
-            margin: 0;
-            padding: 0;
-        }
-        
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            width: 280px;
-            background: linear-gradient(135deg, rgb(134, 65, 244) 0%, rgb(66, 165, 245) 100%);
-            color: white;
-            z-index: 1000;
-            transition: all 0.3s ease;
-        }
-        
-        .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .sidebar-brand {
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-decoration: none;
-            color: white;
-        }
-        
-        .sidebar-brand:hover {
-            color: white;
-        }
-        
-        .user-info {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-        
-        .user-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 10px;
-            font-size: 1.5rem;
-        }
-        
-        .user-avatar-sm {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: rgba(134, 65, 244, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-        }
-        
-        .nav-menu {
-            padding: 20px 0;
-        }
-        
-        .nav-item {
-            margin-bottom: 5px;
-        }
-        
-        .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 12px 20px;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            width: 100%;
-            text-align: left;
-        }
-        
-        .nav-link:hover {
-            background: rgba(255,255,255,0.1);
-            color: white;
-        }
-        
-        .nav-link.active {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border-right: 3px solid white;
-        }
-        
-        .nav-link i {
-            width: 20px;
-            margin-right: 10px;
-        }
-        
-        .main-content {
-            margin-left: 280px;
-            min-height: 100vh;
-            padding: 30px;
-        }
-        
-        .content-section {
-            display: none;
-        }
-        
-        .content-section.active {
-            display: block;
-        }
-        
-        .dashboard-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border: none;
-            margin-bottom: 20px;
-        }
-        
-        .stats-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px;
-            padding: 30px;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        
-        .page-header {
-            margin-bottom: 30px;
-        }
-        
-        .page-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2c3e50;
-        }
-
-        .permission-required {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px;
-            padding: 40px;
-            margin-bottom: 30px;
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-
-        .permission-icon {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-            font-size: 2rem;
-        }
-
-        .request-button {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-            border: none;
-            color: white;
-            padding: 15px 40px;
-            border-radius: 50px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(238, 90, 36, 0.4);
-        }
-
-        .request-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(238, 90, 36, 0.6);
-            color: white;
-        }
-
-        .form-container {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-        
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-            
-            .sidebar.mobile-open {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 0;
-            }
-        }
-    </style>
+    <link href="css/staff_dashboard.css" rel="stylesheet">
 </head>
 <body>
     <div class="sidebar">
@@ -401,30 +200,6 @@ try {
                 <p class="text-muted">Welcome to RILIS Staff Portal</p>
             </div>
             
-            <div class="row mb-4">
-                <div class="col-md-4 mb-3">
-                    <div class="stats-card">
-                        <div class="mb-2"><i class="fas fa-upload fa-2x"></i></div>
-                        <h3>ROR Upload</h3>
-                        <p class="mb-0">Request Permission</p>
-                    </div>
-                </div>
-                <div class="col-md-4 mb-3">
-                    <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                        <div class="mb-2"><i class="fas fa-database fa-2x"></i></div>
-                        <h3>RTS Upload</h3>
-                        <p class="mb-0">Request Permission</p>
-                    </div>
-                </div>
-                <div class="col-md-4 mb-3">
-                    <div class="stats-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
-                        <div class="mb-2"><i class="fas fa-table fa-2x"></i></div>
-                        <h3>View Data</h3>
-                        <p class="mb-0">RTS Table</p>
-                    </div>
-                </div>
-            </div>
-            
             <div class="row">
                 <div class="col-md-8">
                     <div class="card dashboard-card">
@@ -473,25 +248,27 @@ try {
         <div id="ror-upload" class="content-section">
             <div class="page-header">
                 <h1 class="page-title"><i class="fas fa-upload me-3"></i>Request ROR Upload Permission</h1>
-                <p class="text-muted">Click the button below to request ROR file upload access</p>
+                <p class="text-muted">Submit a request to admin for ROR file upload permission</p>
             </div>
-            <div class="permission-required">
-                <div class="permission-icon">
-                    <i class="fas fa-shield-alt"></i>
+            
+            <div class="card dashboard-card">
+                <div class="card-body">
+                    <form method="POST" action="">
+                        <input type="hidden" name="action" value="upload">
+                        <div class="mb-3">
+                            <label for="ror_reason" class="form-label"><i class="fas fa-comment me-2"></i>Reason for Request</label>
+                            <textarea class="form-control" id="ror_reason" name="reason" rows="4" placeholder="Please explain why you need ROR upload permission..." required></textarea>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" name="request_permission" class="btn btn-primary">
+                                <i class="fas fa-paper-plane me-2"></i>Submit Request
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" data-section="dashboard">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                            </button>
+                        </div>
+                    </form>
                 </div>
-                <h3 class="mb-3">Admin Permission Required</h3>
-                <p class="mb-4">You need administrator approval to upload ROR files to the system.</p>
-                <form method="POST" class="d-inline">
-                    <input type="hidden" name="action" value="ror">
-                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                    <input type="hidden" name="request_permission" value="1">
-                    <button type="submit" class="request-button me-3">
-                        <i class="fas fa-paper-plane me-2"></i>Request Permission
-                    </button>
-                </form>
-                <button type="button" class="btn btn-outline-light" data-section="dashboard">
-                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-                </button>
             </div>
         </div>
 
@@ -499,25 +276,27 @@ try {
         <div id="rts-upload" class="content-section">
             <div class="page-header">
                 <h1 class="page-title"><i class="fas fa-database me-3"></i>Request RTS Upload Permission</h1>
-                <p class="text-muted">Click the button below to request RTS data upload access</p>
+                <p class="text-muted">Submit a request to admin for RTS data upload permission</p>
             </div>
-            <div class="permission-required">
-                <div class="permission-icon">
-                    <i class="fas fa-shield-alt"></i>
+            
+            <div class="card dashboard-card">
+                <div class="card-body">
+                    <form method="POST" action="">
+                        <input type="hidden" name="action" value="rts_upload">
+                        <div class="mb-3">
+                            <label for="rts_reason" class="form-label"><i class="fas fa-comment me-2"></i>Reason for Request</label>
+                            <textarea class="form-control" id="rts_reason" name="reason" rows="4" placeholder="Please explain why you need RTS upload permission..." required></textarea>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" name="request_permission" class="btn btn-primary">
+                                <i class="fas fa-paper-plane me-2"></i>Submit Request
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" data-section="dashboard">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                            </button>
+                        </div>
+                    </form>
                 </div>
-                <h3 class="mb-3">Admin Permission Required</h3>
-                <p class="mb-4">You need administrator approval to upload RTS data to the system.</p>
-                <form method="POST" class="d-inline">
-                    <input type="hidden" name="action" value="rts">
-                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                    <input type="hidden" name="request_permission" value="1">
-                    <button type="submit" class="request-button me-3">
-                        <i class="fas fa-paper-plane me-2"></i>Request Permission
-                    </button>
-                </form>
-                <button type="button" class="btn btn-outline-light" data-section="dashboard">
-                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-                </button>
             </div>
         </div>
 
@@ -560,7 +339,7 @@ try {
                             <tbody id="activityTableBody">
                                 <?php if (!empty($activity_logs)): ?>
                                     <?php foreach ($activity_logs as $log): ?>
-                                    <tr class="activity-row" data-action="<?php echo htmlspecialchars($log['action'] ?? ''); ?>">
+                                    <tr class="activity-row" data-action="<?php echo $log['action'] ?? ''; ?>">
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
@@ -583,7 +362,7 @@ try {
                                                         (($log['action'] ?? '') == 'create' ? 'plus' : 
                                                         (($log['action'] ?? '') == 'update' ? 'edit' : 
                                                         (($log['action'] ?? '') == 'delete' ? 'trash' : 'info-circle')))); 
-                                                ?> me-1"></i><?php echo ucfirst(htmlspecialchars($log['action'] ?? 'Unknown')); ?>
+                                                ?> me-1"></i><?php echo ucfirst($log['action'] ?? 'Unknown'); ?>
                                             </span>
                                         </td>
                                         <td><?php echo htmlspecialchars($log['description'] ?? 'No description available'); ?></td>
@@ -609,37 +388,8 @@ try {
             </div>
         </div>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Navigation functionality
-        document.querySelectorAll('.nav-link[data-section]').forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-                this.classList.add('active');
-                document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
-                document.getElementById(this.getAttribute('data-section')).classList.add('active');
-            });
-        });
-
-        document.querySelectorAll('button[data-section]').forEach(button => {
-            button.addEventListener('click', function() {
-                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-                const targetSection = this.getAttribute('data-section');
-                document.querySelector(`.nav-link[data-section="${targetSection}"]`).classList.add('active');
-                document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
-                document.getElementById(targetSection).classList.add('active');
-            });
-        });
-
-        // Activity log filtering
-        document.getElementById('activityFilter').addEventListener('change', function() {
-            const filter = this.value;
-            document.querySelectorAll('.activity-row').forEach(row => {
-                row.style.display = (filter === 'all' || row.getAttribute('data-action') === filter) ? '' : 'none';
-            });
-        });
-    </script>
+    <script src="staff_dashboard.js"></script>
 </body>
 </html>
