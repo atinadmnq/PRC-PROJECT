@@ -1,3 +1,4 @@
+<!-- staff_rts_view.php -->
 <?php
 session_start();
 
@@ -90,6 +91,30 @@ if ($exam !== '') {
     $stmt->execute($params);
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
+// Enhanced activity logs query - same as staff dashboard
+try {
+    $activity_logs = $pdo->query("
+        SELECT 
+            al.*,
+            COALESCE(al.user_name, al.account_name, 'Unknown User') as full_name
+        FROM activity_log al 
+        ORDER BY al.created_at DESC 
+        LIMIT 50
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    try {
+        $activity_logs = $pdo->query("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($activity_logs as &$log) {
+            if (!isset($log['full_name'])) {
+                $log['full_name'] = $log['user_name'] ?? $log['account_name'] ?? 'Unknown User';
+            }
+        }
+    } catch (PDOException $e2) {
+        $activity_logs = [];
+        error_log("Activity log query failed: " . $e2->getMessage());
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -153,6 +178,17 @@ if ($exam !== '') {
             justify-content: center;
             margin: 0 auto 10px;
             font-size: 1.5rem;
+        }
+        
+      .user-avatar-sm {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: rgba(134, 65, 244, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
         }
         
         .nav-menu {
@@ -264,14 +300,7 @@ if ($exam !== '') {
             box-shadow: 0 5px 15px rgba(0,0,0,0.08);
         }
 
-        .table th {
-            background: linear-gradient(135deg, rgb(134, 65, 244) 0%, rgb(66, 165, 245) 100%);
-            color: white;
-            border: none;
-            padding: 15px;
-            font-weight: 600;
-            font-family: "Century Gothic";
-        }
+      
 
         .table td {
             padding: 15px;
@@ -302,6 +331,15 @@ if ($exam !== '') {
             border-radius: 20px;
             padding: 4px 12px;
             font-weight: 700;
+        }
+
+        /* Content section styling */
+        .content-section {
+            display: none;
+        }
+        
+        .content-section.active {
+            display: block;
         }
 
         @media (max-width: 768px) {
@@ -336,135 +374,273 @@ if ($exam !== '') {
         <nav class="nav-menu">
             <ul class="list-unstyled">
                 <li class="nav-item"><a href="staff_dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
-                <li class="nav-item"><a href="staff_dashboard.php" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
-                <li class="nav-item"><a href="staff_dashboard.php" class="nav-link"><i class="fas fa-upload"></i>Request ROR Upload</a></li>
-                <li class="nav-item"><a href="staff_dashboard.php" class="nav-link"><i class="fas fa-upload"></i>Request RTS Upload</a></li>
-                <li class="nav-item"><a href="staff_rts_table_view.php" class="nav-link active"><i class="fas fa-table"></i>RTS Table View</a></li>
+                <li class="nav-item"><button class="nav-link" data-section="activity"><i class="fas fa-history"></i>Activity Log</button></li>
+                <li class="nav-item"><button class="nav-link active" data-section="rts-table"><i class="fas fa-table"></i>RTS Table View</button></li>
+                <li class="nav-item"><a href="viewData.php" class="nav-link"><i class="fas fa-table"></i>ROR Table View</a></li>
                 <li class="nav-item"><a href="staff_dashboard.php?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>
     </div>
     
     <div class="main-content">
-        <div class="page-header">
-            <h1 class="page-title"><i class="fas fa-table me-3"></i>RTS Table View</h1>
-            <p class="text-muted">View uploaded RTS examination data</p>
-        </div>
+        <!-- RTS Table View Section -->
+        <div id="rts-table" class="content-section active">
+            <div class="page-header">
+                <h1 class="page-title"><i class="fas fa-table me-3"></i>RTS Table View</h1>
+                <p class="text-muted">View uploaded RTS examination data</p>
+            </div>
 
-        <!-- Summary Card -->
-        <div class="summary-card">
-            <h4 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Data Summary</h4>
-            <div class="row">
-                <div class="col-md-4">
-                    <div class="text-center">
-                        <h2 class="mb-0"><?= $total_count ?></h2>
-                        <p class="mb-0">Total Records</p>
+            <!-- Summary Card -->
+            <div class="summary-card">
+                <h4 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Data Summary</h4>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="text-center">
+                            <h2 class="mb-0"><?= $total_count ?></h2>
+                            <p class="mb-0">Total Records</p>
+                        </div>
                     </div>
-                </div>
-                <div class="col-md-8">
-                    <h6 class="mb-3">Records by Examination:</h6>
-                    <div class="row">
-                        <?php foreach ($exam_counts as $exam_name => $count): ?>
-                            <div class="col-md-6 mb-2">
-                                <div class="exam-count-item">
-                                    <span class="exam-count-name"><?= htmlspecialchars($exam_name) ?></span>
-                                    <span class="exam-count-number"><?= $count ?></span>
+                    <div class="col-md-8">
+                        <h6 class="mb-3">Records by Examination:</h6>
+                        <div class="row">
+                            <?php foreach ($exam_counts as $exam_name => $count): ?>
+                                <div class="col-md-6 mb-2">
+                                    <div class="exam-count-item">
+                                        <span class="exam-count-name"><?= htmlspecialchars($exam_name) ?></span>
+                                        <span class="exam-count-number"><?= $count ?></span>
+                                    </div>
                                 </div>
-                            </div>
-                        <?php endforeach; ?>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Filter Card -->
-        <div class="filter-card">
-            <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
-            <form method="get" action="" id="filterForm">
-                <div class="row align-items-end">
-                    <div class="col-md-4">
-                        <label for="examSelect" class="form-label"><i class="fas fa-graduation-cap me-1"></i>Select Examination</label>
-                        <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
-                            <option value="">-- Choose an examination --</option>
-                            <?php foreach ($examinations as $examination): ?>
-                                <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($examination) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+            <!-- Filter Card -->
+            <div class="filter-card">
+                <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
+                <form method="get" action="" id="filterForm">
+                    <div class="row align-items-end">
+                        <div class="col-md-4">
+                            <label for="examSelect" class="form-label"><i class="fas fa-graduation-cap me-1"></i>Select Examination</label>
+                            <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
+                                <option value="">-- Choose an examination --</option>
+                                <?php foreach ($examinations as $examination): ?>
+                                    <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($examination) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="searchName" class="form-label"><i class="fas fa-search me-1"></i>Search Name</label>
+                            <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-2"></i>Search</button>
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <label for="searchName" class="form-label"><i class="fas fa-search me-1"></i>Search Name</label>
-                        <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
+                </form>
+            </div>
+
+            <!-- Data Table -->
+            <?php if (!empty($data)): ?>
+                <div class="dashboard-card">
+                    <div class="card-header bg-transparent">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-list me-2"></i>RTS Data for: <?= htmlspecialchars($exam) ?>
+                            <span class="badge bg-primary ms-2"><?= count($data) ?> records</span>
+                        </h5>
                     </div>
-                    <div class="col-md-4">
-                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-2"></i>Search</button>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th><i class="fas fa-hashtag me-1"></i>ID</th>
+                                        <th><i class="fas fa-user me-1"></i>Name</th>
+                                        <th><i class="fas fa-graduation-cap me-1"></i>Examination</th>
+                                        <th><i class="fas fa-calendar me-1"></i>Exam Date</th>
+                                        <th><i class="fas fa-clock me-1"></i>Upload Timestamp</th>
+                                        <th><i class="fas fa-info-circle me-1"></i>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($data as $row): ?>
+                                        <tr>
+                                            <td><strong><?= htmlspecialchars($row['id']) ?></strong></td>
+                                            <td><?= htmlspecialchars($row['name']) ?></td>
+                                            <td>
+                                                <span class="badge bg-info"><?= htmlspecialchars($row['examination']) ?></span>
+                                            </td>
+                                            <td><?= htmlspecialchars($row['exam_date']) ?></td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    <?= htmlspecialchars(date("M d, Y", strtotime($row['upload_timestamp']))) ?><br>
+                                                    <?= htmlspecialchars(date("h:i A", strtotime($row['upload_timestamp']))) ?>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-warning"><?= htmlspecialchars($row['status']) ?></span>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-            </form>
+            <?php elseif ($exam !== ''): ?>
+                <div class="dashboard-card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-search fa-4x text-muted mb-3"></i>
+                        <h5 class="text-muted">No Records Found</h5>
+                        <p class="text-muted">No records found for examination: <strong><?= htmlspecialchars($exam) ?></strong></p>
+                        <?php if ($search_name !== ''): ?>
+                            <p class="text-muted">with name containing: <strong><?= htmlspecialchars($search_name) ?></strong></p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
+        <!-- Activity Log Section -->
+        <div id="activity" class="content-section">
+            <div class="page-header">
+                <h1 class="page-title"><i class="fas fa-history me-3"></i>Activity Log</h1>
+                <p class="text-muted">Monitor all system activities and user actions</p>
+            </div>
 
-        <!-- Data Table -->
-        <?php if (!empty($data)): ?>
-            <div class="dashboard-card">
+            <div class="card dashboard-card">
                 <div class="card-header bg-transparent">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-list me-2"></i>RTS Data for: <?= htmlspecialchars($exam) ?>
-                        <span class="badge bg-primary ms-2"><?= count($data) ?> records</span>
-                    </h5>
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>Recent Activities</h5>
+                        </div>
+                        <div class="col-auto">
+                            <select class="form-select form-select-sm" id="activityFilter">
+                                <option value="all">All Activities</option>
+                                <option value="login">Login Activities</option>
+                                <option value="logout">Logout Activities</option>
+                                <option value="create">Create Activities</option>
+                                <option value="update">Update Activities</option>
+                                <option value="delete">Delete Activities</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
-                            <thead>
+                            <thead class="table-light">
                                 <tr>
-                                    <th><i class="fas fa-hashtag me-1"></i>ID</th>
-                                    <th><i class="fas fa-user me-1"></i>Name</th>
-                                    <th><i class="fas fa-graduation-cap me-1"></i>Examination</th>
-                                    <th><i class="fas fa-calendar me-1"></i>Exam Date</th>
-                                    <th><i class="fas fa-clock me-1"></i>Upload Timestamp</th>
-                                    <th><i class="fas fa-info-circle me-1"></i>Status</th>
+                                    <th><i class="fas fa-user me-1"></i>User</th>
+                                    <th><i class="fas fa-cog me-1"></i>Action</th>
+                                    <th><i class="fas fa-info-circle me-1"></i>Description</th>
+                                    <th><i class="fas fa-clock me-1"></i>Date & Time</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <?php foreach ($data as $row): ?>
-                                    <tr>
-                                        <td><strong><?= htmlspecialchars($row['id']) ?></strong></td>
-                                        <td><?= htmlspecialchars($row['name']) ?></td>
+                            <tbody id="activityTableBody">
+                                <?php if (!empty($activity_logs)): ?>
+                                    <?php foreach ($activity_logs as $log): ?>
+                                    <tr class="activity-row" data-action="<?php echo $log['action'] ?? ''; ?>">
                                         <td>
-                                            <span class="badge bg-info"><?= htmlspecialchars($row['examination']) ?></span>
+                                            <div class="d-flex align-items-center">
+                                                <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
+                                                <div>
+                                                    <div class="fw-medium"><?php echo htmlspecialchars($log['full_name'] ?? 'Unknown User'); ?></div>
+                                                </div>
+                                            </div>
                                         </td>
-                                        <td><?= htmlspecialchars($row['exam_date']) ?></td>
+                                        <td>
+                                            <span class="badge bg-<?php 
+                                                echo ($log['action'] ?? '') == 'login' ? 'success' : 
+                                                    (($log['action'] ?? '') == 'logout' ? 'danger' : 
+                                                    (($log['action'] ?? '') == 'create' ? 'primary' : 
+                                                    (($log['action'] ?? '') == 'update' ? 'warning' : 
+                                                    (($log['action'] ?? '') == 'delete' ? 'danger' : 'secondary')))); 
+                                            ?>">
+                                                <i class="fas fa-<?php 
+                                                    echo ($log['action'] ?? '') == 'login' ? 'sign-in-alt' : 
+                                                        (($log['action'] ?? '') == 'logout' ? 'sign-out-alt' : 
+                                                        (($log['action'] ?? '') == 'create' ? 'plus' : 
+                                                        (($log['action'] ?? '') == 'update' ? 'edit' : 
+                                                        (($log['action'] ?? '') == 'delete' ? 'trash' : 'info-circle')))); 
+                                                ?> me-1"></i><?php echo ucfirst($log['action'] ?? 'Unknown'); ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($log['description'] ?? 'No description available'); ?></td>
                                         <td>
                                             <small class="text-muted">
-                                                <?= htmlspecialchars(date("M d, Y", strtotime($row['upload_timestamp']))) ?><br>
-                                                <?= htmlspecialchars(date("h:i A", strtotime($row['upload_timestamp']))) ?>
+                                                <i class="fas fa-calendar me-1"></i><?php echo isset($log['created_at']) ? date('M j, Y', strtotime($log['created_at'])) : 'Unknown date'; ?><br>
+                                                <i class="fas fa-clock me-1"></i><?php echo isset($log['created_at']) ? date('g:i A', strtotime($log['created_at'])) : 'Unknown time'; ?>
                                             </small>
                                         </td>
-                                        <td>
-                                            <span class="badge bg-warning"><?= htmlspecialchars($row['status']) ?></span>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">
+                                            <i class="fas fa-info-circle me-2"></i>No activity logs available
                                         </td>
                                     </tr>
-                                <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
-        <?php elseif ($exam !== ''): ?>
-            <div class="dashboard-card">
-                <div class="card-body text-center py-5">
-                    <i class="fas fa-search fa-4x text-muted mb-3"></i>
-                    <h5 class="text-muted">No Records Found</h5>
-                    <p class="text-muted">No records found for examination: <strong><?= htmlspecialchars($exam) ?></strong></p>
-                    <?php if ($search_name !== ''): ?>
-                        <p class="text-muted">with name containing: <strong><?= htmlspecialchars($search_name) ?></strong></p>
-                    <?php endif; ?>
-                </div>
-            </div>
-        <?php endif; ?>
+        </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Navigation functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const navLinks = document.querySelectorAll('.nav-link[data-section]');
+            const contentSections = document.querySelectorAll('.content-section');
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const targetSection = this.getAttribute('data-section');
+                    
+                    // Remove active class from all nav links
+                    navLinks.forEach(nl => nl.classList.remove('active'));
+                    
+                    // Add active class to clicked nav link
+                    this.classList.add('active');
+                    
+                    // Hide all content sections
+                    contentSections.forEach(section => section.classList.remove('active'));
+                    
+                    // Show target section
+                    const targetElement = document.getElementById(targetSection);
+                    if (targetElement) {
+                        targetElement.classList.add('active');
+                    }
+                });
+            });
+
+            // Activity log filtering functionality - updated to match staff_dashboard.php
+            const activityFilter = document.getElementById('activityFilter');
+            if (activityFilter) {
+                activityFilter.addEventListener('change', function() {
+                    const filter = this.value;
+                    const activityRows = document.querySelectorAll('.activity-row');
+                    
+                    activityRows.forEach(row => {
+                        const rowAction = row.getAttribute('data-action');
+                        
+                        // Show row if filter is 'all' or matches the row's action
+                        if (filter === 'all' || rowAction === filter) {
+                            row.style.display = '';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+                });
+            }
+        });
+    </script>
 </body>
 </html>

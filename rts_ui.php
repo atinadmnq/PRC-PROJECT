@@ -309,9 +309,7 @@ if (isset($_GET['logout'])) { session_destroy(); header("Location: index.php"); 
         <nav class="nav-menu">
             <ul class="list-unstyled">
                 <li class="nav-item"><a href="dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
-                <?php if (($_SESSION['role'] ?? '') === 'admin'): ?>
-                    <li class="nav-item"><a href="dashboard.php#users" class="nav-link"><i class="fas fa-users"></i>Users</a></li>
-                    <li class="nav-item"><a href="dashboard.php#register" class="nav-link"><i class="fas fa-user-plus"></i>Register User</a></li>
+                <?php if (($_SESSION['role'] ?? '') === 'admin'): ?>                    <li class="nav-item"><a href="dashboard.php#register" class="nav-link"><i class="fas fa-user-plus"></i>Register User</a></li>
                     <li class="nav-item"><a href="dashboard.php#activity" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
                 <?php endif; ?>
                 <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload ROR Data</a></li>

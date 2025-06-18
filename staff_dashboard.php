@@ -1,3 +1,4 @@
+<!-- staff_dashboard.php -->
 <?php
 session_start();
 
@@ -82,18 +83,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_user'])) {
     }
 }
 
-// Handle approve/reject requests
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['approve_request']) || isset($_POST['reject_request']))) {
-    $request_id = $_POST['request_id'];
-    $action = isset($_POST['approve_request']) ? 'approved' : 'rejected';
-    $stmt = $pdo->prepare("UPDATE permission_requests SET status = ? WHERE id = ?");
-    $stmt->execute([$action, $request_id]);
-    $_SESSION['admin_action'] = true;
-    $_SESSION['admin_message'] = "Request #" . $request_id . " has been " . $action . ".";
-}
-
-// Fetch data
-$pending_requests = $pdo->query("SELECT * FROM permission_requests WHERE status = 'pending' ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
 
 // Fixed activity logs query
 try {
@@ -148,7 +137,150 @@ function getUserPermissions($pdo, $user_email) {
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="css/staff_dashboard.css" rel="stylesheet">
+  <style>
+    body {
+            background: #f8f9fa;
+            font-family: "Century Gothic";
+            margin: 0;
+            padding: 0;
+        }
+        
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 280px;
+            background: linear-gradient(135deg, rgb(134, 65, 244) 0%, rgb(66, 165, 245) 100%);
+            color: white;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .sidebar-brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-decoration: none;
+            color: white;
+        }
+        
+        .sidebar-brand:hover {
+            color: white;
+        }
+        
+        .user-info {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+        
+        .user-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            font-size: 1.5rem;
+        }
+        
+        .user-avatar-sm {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: rgba(134, 65, 244, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+        }
+        
+        .nav-menu {
+            padding: 20px 0;
+        }
+        
+        .nav-item {
+            margin-bottom: 5px;
+        }
+        
+        .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 12px 20px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+        
+        .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+        
+        .nav-link.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border-right: 3px solid white;
+        }
+        
+        .nav-link i {
+            width: 20px;
+            margin-right: 10px;
+        }
+        
+        .main-content {
+            margin-left: 280px;
+            min-height: 100vh;
+            padding: 30px;
+        }
+        
+        .content-section {
+            display: none;
+        }
+        
+        .content-section.active {
+            display: block;
+        }
+        
+        .dashboard-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border: none;
+            margin-bottom: 20px;
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .page-header {
+            margin-bottom: 30px;
+        }
+        
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+     
+    </style>
 </head>
 <body>
     <div class="sidebar">
@@ -168,9 +300,8 @@ function getUserPermissions($pdo, $user_email) {
             <ul class="list-unstyled">
                 <li class="nav-item"><button class="nav-link active" data-section="dashboard"><i class="fas fa-tachometer-alt"></i>Dashboard</button></li>
                 <li class="nav-item"><button class="nav-link" data-section="activity"><i class="fas fa-history"></i>Activity Log</button></li>
-                <li class="nav-item"><button class="nav-link" data-section="ror-upload"><i class="fas fa-upload"></i>Request ROR Upload</button></li>
-                <li class="nav-item"><button class="nav-link" data-section="rts-upload"><i class="fas fa-upload"></i>Request RTS Upload</button></li>
                 <li class="nav-item"><a href="staff_rts_view.php" class="nav-link"><i class="fas fa-table"></i>RTS Table View</a></li>
+                <li class="nav-item"><a href="viewData.php" class="nav-link"><i class="fas fa-table"></i>ROR Table View</a></li>
                 <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>
@@ -197,7 +328,7 @@ function getUserPermissions($pdo, $user_email) {
         <div id="dashboard" class="content-section active">
             <div class="page-header">
                 <h1 class="page-title"><i class="fas fa-tachometer-alt me-3"></i>Staff Dashboard</h1>
-                <p class="text-muted">Welcome to RILIS Staff Portal</p>
+                <p class="text-muted">Report of Rating Issuance Logistics and Inventory System</p>
             </div>
             
             <div class="row">
@@ -234,8 +365,7 @@ function getUserPermissions($pdo, $user_email) {
                         </div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
-                                <button class="btn btn-outline-primary" data-section="ror-upload"><i class="fas fa-upload me-2"></i>Request ROR Upload</button>
-                                <button class="btn btn-outline-secondary" data-section="rts-upload"><i class="fas fa-database me-2"></i>Request RTS Upload</button>
+                                <a href="staff_rts_view.php" class="btn btn-outline-info"><i class="fas fa-table me-2"></i>View ROR Data</a>
                                 <a href="staff_rts_view.php" class="btn btn-outline-info"><i class="fas fa-table me-2"></i>View RTS Data</a>
                             </div>
                         </div>
@@ -244,61 +374,7 @@ function getUserPermissions($pdo, $user_email) {
             </div>
         </div>
 
-        <!-- ROR Upload Request Section -->
-        <div id="ror-upload" class="content-section">
-            <div class="page-header">
-                <h1 class="page-title"><i class="fas fa-upload me-3"></i>Request ROR Upload Permission</h1>
-                <p class="text-muted">Submit a request to admin for ROR file upload permission</p>
-            </div>
-            
-            <div class="card dashboard-card">
-                <div class="card-body">
-                    <form method="POST" action="">
-                        <input type="hidden" name="action" value="upload">
-                        <div class="mb-3">
-                            <label for="ror_reason" class="form-label"><i class="fas fa-comment me-2"></i>Reason for Request</label>
-                            <textarea class="form-control" id="ror_reason" name="reason" rows="4" placeholder="Please explain why you need ROR upload permission..." required></textarea>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="submit" name="request_permission" class="btn btn-primary">
-                                <i class="fas fa-paper-plane me-2"></i>Submit Request
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary" data-section="dashboard">
-                                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <!-- RTS Upload Request Section -->
-        <div id="rts-upload" class="content-section">
-            <div class="page-header">
-                <h1 class="page-title"><i class="fas fa-database me-3"></i>Request RTS Upload Permission</h1>
-                <p class="text-muted">Submit a request to admin for RTS data upload permission</p>
-            </div>
-            
-            <div class="card dashboard-card">
-                <div class="card-body">
-                    <form method="POST" action="">
-                        <input type="hidden" name="action" value="rts_upload">
-                        <div class="mb-3">
-                            <label for="rts_reason" class="form-label"><i class="fas fa-comment me-2"></i>Reason for Request</label>
-                            <textarea class="form-control" id="rts_reason" name="reason" rows="4" placeholder="Please explain why you need RTS upload permission..." required></textarea>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="submit" name="request_permission" class="btn btn-primary">
-                                <i class="fas fa-paper-plane me-2"></i>Submit Request
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary" data-section="dashboard">
-                                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
+        
 
         <!-- Activity Log Section -->
         <div id="activity" class="content-section">
@@ -390,6 +466,74 @@ function getUserPermissions($pdo, $user_email) {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="staff_dashboard.js"></script>
+    <script>
+        
+
+// Navigation functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle navigation links with data-section attribute
+    document.querySelectorAll('.nav-link[data-section]').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Remove active class from all nav links
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            
+            // Add active class to clicked link
+            this.classList.add('active');
+            
+            // Hide all content sections
+            document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+            
+            // Show target section
+            const targetSection = this.getAttribute('data-section');
+            document.getElementById(targetSection).classList.add('active');
+        });
+    });
+
+    // Handle buttons with data-section attribute (for quick actions and other buttons)
+    document.querySelectorAll('button[data-section]').forEach(button => {
+        button.addEventListener('click', function() {
+            // Remove active class from all nav links
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            
+            // Add active class to corresponding nav link
+            const targetSection = this.getAttribute('data-section');
+            const correspondingNavLink = document.querySelector(`.nav-link[data-section="${targetSection}"]`);
+            if (correspondingNavLink) {
+                correspondingNavLink.classList.add('active');
+            }
+            
+            // Hide all content sections
+            document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+            
+            // Show target section
+            document.getElementById(targetSection).classList.add('active');
+        });
+    });
+
+    // Activity log filtering functionality
+    const activityFilter = document.getElementById('activityFilter');
+    if (activityFilter) {
+        activityFilter.addEventListener('change', function() {
+            const filter = this.value;
+            const activityRows = document.querySelectorAll('.activity-row');
+            
+            activityRows.forEach(row => {
+                const rowAction = row.getAttribute('data-action');
+                
+                // Show row if filter is 'all' or matches the row's action
+                if (filter === 'all' || rowAction === filter) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    }
+});
+
+
+    </script>
 </body>
 </html>

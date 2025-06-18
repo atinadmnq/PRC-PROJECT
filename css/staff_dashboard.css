@@ -200,3 +200,60 @@ body {
                 margin-left: 0;
             }
         }
+        /* Add this to your staff_dashboard.css */
+
+/* Permission status indicators */
+.nav-link.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.nav-link .badge {
+    font-size: 0.65em;
+    padding: 0.2em 0.4em;
+}
+
+/* Success state for granted permissions */
+.nav-link .text-success {
+    color: #198754 !important;
+}
+
+/* Warning state for pending requests */
+.nav-link .text-warning {
+    color: #ffc107 !important;
+}
+
+/* Permission badges in quick actions */
+.card-body .badge {
+    font-size: 0.75em;
+}
+
+/* Animated pulse for pending status */
+.btn.btn-warning.disabled {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+/* Permission section styling */
+.border-top {
+    border-top: 1px solid #dee2e6 !important;
+}
+
+.badge.bg-success {
+    background-color: #198754 !important;
+}
+
+/* Status icons */
+.fas.fa-check-circle {
+    color: #198754;
+}
+
+.fas.fa-clock {
+    color: #ffc107;
+}

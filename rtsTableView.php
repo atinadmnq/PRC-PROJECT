@@ -1,4 +1,4 @@
-<!-- uploadData_ui.php -->
+<!-- rtsTableView.php -->
 <?php
 session_start();
 

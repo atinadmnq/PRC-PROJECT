@@ -96,7 +96,7 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RILIS - Secure Access</title>
+    <title>RILIS</title>
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -114,7 +114,7 @@ $conn->close();
                                 <img style="width: 90px; height: 90px;" src="img/rilis-logo.png" alt="RILIS Logo">
                             </div>
                             <h2 class="card-title" style="color: #9EC6F3">RILIS</h2>
-                            <p class="card-subtitle">Secure PRC Release Management</p>
+                            <p class="card-subtitle">Report of Rating Issuance Logistics and Inventory System</p>
                         </div>
                         <?php if (!empty($error_message)): ?>
                             <div class="alert alert-danger alert-dismissible fade show" role="alert">
