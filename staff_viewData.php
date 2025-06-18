@@ -43,6 +43,30 @@ function logActivity($username, $action, $details = '') {
 // Log the RTS table view access
 logActivity($_SESSION['account_name'] ?? $_SESSION['email'], 'rts_table_view_access', 'Staff accessed RTS table view');
 
+// Fixed activity logs query - matching staff_dashboard.php
+try {
+    $activity_logs = $pdo->query("
+        SELECT 
+            al.*,
+            COALESCE(al.user_name, al.account_name, 'Unknown User') as full_name
+        FROM activity_log al 
+        ORDER BY al.created_at DESC 
+        LIMIT 50
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    try {
+        $activity_logs = $pdo->query("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($activity_logs as &$log) {
+            if (!isset($log['full_name'])) {
+                $log['full_name'] = $log['user_name'] ?? $log['account_name'] ?? 'Unknown User';
+            }
+        }
+    } catch (PDOException $e2) {
+        $activity_logs = [];
+        error_log("Activity log query failed: " . $e2->getMessage());
+    }
+}
+
 // Handle "Release" (Delete) action
 if (isset($_POST['release_id'])) {
     $release_id = intval($_POST['release_id']);
@@ -106,30 +130,6 @@ if ($exam !== '') {
     $stmt->execute($params);
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-
-// Activity logs for the Activity Log section
-try {
-    $activity_logs = $pdo->query("
-        SELECT 
-            al.*,
-            COALESCE(al.user_name, al.account_name, 'Unknown User') as full_name
-        FROM activity_log al 
-        ORDER BY al.created_at DESC 
-        LIMIT 50
-    ")->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    try {
-        $activity_logs = $pdo->query("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($activity_logs as &$log) {
-            if (!isset($log['full_name'])) {
-                $log['full_name'] = $log['user_name'] ?? $log['account_name'] ?? 'Unknown User';
-            }
-        }
-    } catch (PDOException $e2) {
-        $activity_logs = [];
-        error_log("Activity log query failed: " . $e2->getMessage());
-    }
-}
 ?>
 
 <!DOCTYPE html>
@@ -155,7 +155,7 @@ try {
             left: 0;
             height: 100vh;
             width: 280px;
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
+            background: linear-gradient(135deg, rgb(134, 65, 244) 0%, rgb(66, 165, 245) 100%);
             color: white;
             z-index: 1000;
             transition: all 0.3s ease;
@@ -195,9 +195,15 @@ try {
             font-size: 1.5rem;
         }
         
-        .user-name {
-            font-weight: 600;
-            margin-bottom: 5px;
+        .user-avatar-sm {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: rgba(134, 65, 244, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
         }
         
         .nav-menu {
@@ -269,47 +275,14 @@ try {
             color: #2c3e50;
         }
         
-        .stat-card {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-        }
-        
         .stat-value {
             font-size: 2rem;
             font-weight: 700;
-            margin-bottom: 5px;
         }
         
         .stat-label {
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-        
-        .user-avatar-sm {
-            width: 35px;
-            height: 35px;
-            border-radius: 50%;
-            background: #e9ecef;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #6c757d;
-        }
-        
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-            
-            .sidebar.mobile-open {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 0;
-            }
+            font-size: 0.875rem;
+            opacity: 0.9;
         }
     </style>
 </head>
@@ -321,25 +294,25 @@ try {
                 RILIS
             </a>
         </div>
-        <div class="user-info">
+         <div class="user-info">
             <div class="user-avatar"><i class="fas fa-user"></i></div>
             <div class="user-name"><?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['email'] ?? 'User'); ?></div>
             <small class="text-light"><?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?></small>
             <small class="text-light">Staff Member</small>
         </div>
-        <nav class="nav-menu">
+       <nav class="nav-menu">
             <ul class="list-unstyled">
-                <li class="nav-item"><a href="dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
+                <li class="nav-item"><a href="staff_dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
                 <li class="nav-item"><button class="nav-link" data-section="activity"><i class="fas fa-history"></i>Activity Log</button></li>
-                <li class="nav-item"><a href="viewData.php" class="nav-link active"><i class="fas fa-table"></i>ROR Table View</a></li>
-                <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-table"></i>Upload RTS</a></li>
+                <li class="nav-item"><a href="staff_rts_view.php" class="nav-link"><i class="fas fa-table"></i>RTS Table View</a></li>
+                <li class="nav-item"><button class="nav-link active" data-section="ror-data"><i class="fas fa-table"></i>ROR Table View</button></li>
                 <li class="nav-item"><a href="staff_dashboard.php?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>
     </div>
     
     <div class="main-content">
-        <!-- Main ROR Data View Section -->
+        <!-- ROR Data Section -->
         <div id="ror-data" class="content-section active">
             <div class="page-header">
                 <h1 class="page-title"><i class="fas fa-table me-3"></i>View Uploaded ROR Data</h1>
@@ -523,52 +496,81 @@ try {
                                     <th><i class="fas fa-clock me-1"></i>Date & Time</th>
                                 </tr>
                             </thead>
-                            <tbody id="activityTableBody">
-                                <?php if (!empty($activity_logs)): ?>
-                                    <?php foreach ($activity_logs as $log): ?>
-                                    <tr class="activity-row" data-action="<?php echo $log['action'] ?? ''; ?>">
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
-                                                <div>
-                                                    <div class="fw-medium"><?php echo htmlspecialchars($log['full_name'] ?? 'Unknown User'); ?></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-<?php 
-                                                echo ($log['action'] ?? '') == 'login' ? 'success' : 
-                                                    (($log['action'] ?? '') == 'logout' ? 'danger' : 
-                                                    (($log['action'] ?? '') == 'create' ? 'primary' : 
-                                                    (($log['action'] ?? '') == 'update' ? 'warning' : 
-                                                    (($log['action'] ?? '') == 'delete' ? 'danger' : 'secondary')))); 
-                                            ?>">
-                                                <i class="fas fa-<?php 
-                                                    echo ($log['action'] ?? '') == 'login' ? 'sign-in-alt' : 
-                                                        (($log['action'] ?? '') == 'logout' ? 'sign-out-alt' : 
-                                                        (($log['action'] ?? '') == 'create' ? 'plus' : 
-                                                        (($log['action'] ?? '') == 'update' ? 'edit' : 
-                                                        (($log['action'] ?? '') == 'delete' ? 'trash' : 'info-circle')))); 
-                                                ?> me-1"></i><?php echo ucfirst($log['action'] ?? 'Unknown'); ?>
-                                            </span>
-                                        </td>
-                                        <td><?php echo htmlspecialchars($log['description'] ?? 'No description available'); ?></td>
-                                        <td>
-                                            <small class="text-muted">
-                                                <i class="fas fa-calendar me-1"></i><?php echo isset($log['created_at']) ? date('M j, Y', strtotime($log['created_at'])) : 'Unknown date'; ?><br>
-                                                <i class="fas fa-clock me-1"></i><?php echo isset($log['created_at']) ? date('g:i A', strtotime($log['created_at'])) : 'Unknown time'; ?>
-                                            </small>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <tr>
-                                        <td colspan="4" class="text-center text-muted py-4">
-                                            <i class="fas fa-info-circle me-2"></i>No activity logs available
-                                        </td>
-                                    </tr>
-                                <?php endif; ?>
-                            </tbody>
+                            <?php
+// Replace this section in your viewData.php (around line 45-65)
+
+// Fixed activity logs query - exactly matching staff_dashboard.php
+try {
+    $activity_logs = $pdo->query("
+        SELECT 
+            al.*,
+            COALESCE(al.user_name, al.account_name, 'Unknown User') as full_name
+        FROM activity_log al 
+        ORDER BY al.created_at DESC 
+        LIMIT 50
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    try {
+        $activity_logs = $pdo->query("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($activity_logs as &$log) {
+            if (!isset($log['full_name'])) {
+                $log['full_name'] = $log['user_name'] ?? $log['account_name'] ?? 'Unknown User';
+            }
+        }
+    } catch (PDOException $e2) {
+        $activity_logs = [];
+        error_log("Activity log query failed: " . $e2->getMessage());
+    }
+}
+?>
+
+<tbody id="activityTableBody">
+    <?php if (!empty($activity_logs)): ?>
+        <?php foreach ($activity_logs as $log): ?>
+        <tr class="activity-row" data-action="<?php echo $log['action'] ?? ''; ?>">
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
+                    <div>
+                        <div class="fw-medium"><?php echo htmlspecialchars($log['full_name'] ?? 'Unknown User'); ?></div>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <span class="badge bg-<?php 
+                    echo ($log['action'] ?? '') == 'login' ? 'success' : 
+                        (($log['action'] ?? '') == 'logout' ? 'danger' : 
+                        (($log['action'] ?? '') == 'create' ? 'primary' : 
+                        (($log['action'] ?? '') == 'update' ? 'warning' : 
+                        (($log['action'] ?? '') == 'delete' ? 'danger' : 'secondary')))); 
+                ?>">
+                    <i class="fas fa-<?php 
+                        echo ($log['action'] ?? '') == 'login' ? 'sign-in-alt' : 
+                            (($log['action'] ?? '') == 'logout' ? 'sign-out-alt' : 
+                            (($log['action'] ?? '') == 'create' ? 'plus' : 
+                            (($log['action'] ?? '') == 'update' ? 'edit' : 
+                            (($log['action'] ?? '') == 'delete' ? 'trash' : 'info-circle')))); 
+                    ?> me-1"></i><?php echo ucfirst($log['action'] ?? 'Unknown'); ?>
+                </span>
+            </td>
+            <td><?php echo htmlspecialchars($log['description'] ?? 'No description available'); ?></td>
+            <td>
+                <small class="text-muted">
+                    <i class="fas fa-calendar me-1"></i><?php echo isset($log['created_at']) ? date('M j, Y', strtotime($log['created_at'])) : 'Unknown date'; ?><br>
+                    <i class="fas fa-clock me-1"></i><?php echo isset($log['created_at']) ? date('g:i A', strtotime($log['created_at'])) : 'Unknown time'; ?>
+                </small>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <tr>
+            <td colspan="4" class="text-center text-muted py-4">
+                <i class="fas fa-info-circle me-2"></i>No activity logs available
+            </td>
+        </tr>
+    <?php endif; ?>
+</tbody>
+
                         </table>
                     </div>
                 </div>
@@ -578,34 +580,26 @@ try {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Navigation functionality
-        document.querySelectorAll('.nav-link[data-section]').forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-                this.classList.add('active');
-                document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
-                document.getElementById(this.getAttribute('data-section')).classList.add('active');
-            });
-        });
 
-        document.querySelectorAll('button[data-section]').forEach(button => {
-            button.addEventListener('click', function() {
-                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-                const targetSection = this.getAttribute('data-section');
-                document.querySelector(`.nav-link[data-section="${targetSection}"]`).classList.add('active');
-                document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
-                document.getElementById(targetSection).classList.add('active');
-            });
-        });
-
-        // Activity log filtering
-        document.getElementById('activityFilter').addEventListener('change', function() {
-            const filter = this.value;
-            document.querySelectorAll('.activity-row').forEach(row => {
-                row.style.display = (filter === 'all' || row.getAttribute('data-action') === filter) ? '' : 'none';
-            });
-        });
+            // Activity log filtering functionality - updated to match staff_dashboard.php
+            const activityFilter = document.getElementById('activityFilter');
+            if (activityFilter) {
+                activityFilter.addEventListener('change', function() {
+                    const filter = this.value;
+                    const activityRows = document.querySelectorAll('.activity-row');
+                    
+                    activityRows.forEach(row => {
+                        const rowAction = row.getAttribute('data-action');
+                        
+                        // Show row if filter is 'all' or matches the row's action
+                        if (filter === 'all' || rowAction === filter) {
+                            row.style.display = '';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+                });
+            }
     </script>
 </body>
 </html>

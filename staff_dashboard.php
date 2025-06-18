@@ -35,54 +35,6 @@ if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
 
 if (isset($_GET['logout'])) { session_destroy(); header("Location: index.php"); exit(); }
 
-// Handle permission requests
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_permission'])) {
-    $action = $_POST['action']; // 'upload' for ROR or 'rts_upload' for RTS
-    $reason = trim($_POST['reason']);
-    $user_email = $_SESSION['email'] ?? '';
-    
-    if (!empty($reason) && !empty($action)) {
-        // Check if user already has a pending request for this action
-        $stmt = $pdo->prepare("SELECT id FROM permission_requests WHERE email = ? AND action = ? AND status = 'pending'");
-        $stmt->execute([$user_email, $action]);
-        
-        if ($stmt->rowCount() == 0) {
-            // Insert new permission request
-            $stmt = $pdo->prepare("INSERT INTO permission_requests (email, action, reason, status, created_at) VALUES (?, ?, ?, 'pending', NOW())");
-            if ($stmt->execute([$user_email, $action, $reason])) {
-                $_SESSION['permission_requested'] = true;
-                $_SESSION['request_message'] = "Permission request submitted successfully! Admin will review your request.";
-            } else {
-                $_SESSION['error_message'] = "Failed to submit request. Please try again.";
-            }
-        } else {
-            $_SESSION['error_message'] = "You already have a pending request for this action.";
-        }
-    } else {
-        $_SESSION['error_message'] = "Please provide a reason for your request.";
-    }
-}
-
-// Handle registration
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_user'])) {
-    $full_name = trim($_POST['full_name']); $email = trim($_POST['email']); $password = $_POST['password']; $role = $_POST['role'];
-    
-    if (!empty($full_name) && !empty($email) && !empty($password) && !empty($role)) {
-        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        
-        if ($stmt->rowCount() == 0) {
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO users (full_name, email, password, role, created_at) VALUES (?, ?, ?, ?, NOW())");
-            $_SESSION['reg_success'] = $stmt->execute([$full_name, $email, $hashed_password, $role]) ? "User registered successfully!" : "Registration failed. Please try again.";
-        } else {
-            $_SESSION['reg_error'] = "Email already exists.";
-        }
-    } else {
-        $_SESSION['reg_error'] = "Please fill in all fields.";
-    }
-}
-
 
 // Fixed activity logs query
 try {
@@ -301,7 +253,7 @@ function getUserPermissions($pdo, $user_email) {
                 <li class="nav-item"><button class="nav-link active" data-section="dashboard"><i class="fas fa-tachometer-alt"></i>Dashboard</button></li>
                 <li class="nav-item"><button class="nav-link" data-section="activity"><i class="fas fa-history"></i>Activity Log</button></li>
                 <li class="nav-item"><a href="staff_rts_view.php" class="nav-link"><i class="fas fa-table"></i>RTS Table View</a></li>
-                <li class="nav-item"><a href="viewData.php" class="nav-link"><i class="fas fa-table"></i>ROR Table View</a></li>
+                <li class="nav-item"><a href="staff_viewData.php" class="nav-link"><i class="fas fa-table"></i>ROR Table View</a></li>
                 <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>
