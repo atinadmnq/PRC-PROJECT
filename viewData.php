@@ -302,30 +302,34 @@ try {
             font-size: 0.9rem;
         }
         
-        .exam-count-item {
-            display: flex;
-            justify-content: between;
-            align-items: center;
-            padding: 10px 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-        
-        .exam-count-name {
-            font-weight: 500;
-            font-size: 0.9rem;
-            color: #495057;
-        }
-        
-        .exam-count-badge {
-            background: #4285f4;
-            color: white;
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
+      .exam-count-item {
+    display: flex;
+    justify-content: space-between; /* Changed from 'between' to 'space-between' */
+    align-items: center;
+    padding: 10px 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.exam-count-name {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: #495057;
+    flex: 1; /* Added to take up available space */
+    margin-right: 10px; /* Added spacing between name and count */
+    word-wrap: break-word; /* Handle long examination names */
+}
+
+.exam-count-badge {
+    background: #4285f4;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    flex-shrink: 0; /* Prevent the badge from shrinking */
+}
         
         .user-avatar-sm {
             width: 35px;
