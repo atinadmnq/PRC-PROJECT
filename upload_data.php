@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once 'activity_logger.php'; // Include the logging functions
 include 'db_connect.php';
 
 require 'vendor/autoload.php'; 
@@ -8,9 +9,20 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
     $file = $_FILES["excel_file"]["tmp_name"];
+    $fileName = $_FILES["excel_file"]["name"] ?? 'Unknown File';
     
     if (!file_exists($file)) {
         $_SESSION["error"] = "File not found.";
+        
+        // Log failed upload attempt
+        logActivity(
+            $conn, 
+            $_SESSION['user_id'] ?? null, 
+            $_SESSION['full_name'] ?? 'Unknown User', 
+            'upload_ror', 
+            "Failed to upload ROR file: {$fileName} - Error: File not found"
+        );
+        
         header("Location: update_data.php");
         exit();
     }
@@ -52,20 +64,55 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         }
 
         if ($recordsInserted > 0) {
-            // logActivity("Uploaded ROR Excel with $recordsInserted records (Timestamp: $upload_timestamp)", "admin");
-            $_SESSION["message"] = "Excel file uploaded successfully!";
+            // Log successful ROR upload
+            logRORUpload(
+                $conn, 
+                $_SESSION['user_id'] ?? null, 
+                $_SESSION['full_name'] ?? 'Unknown User', 
+                $fileName, 
+                $recordsInserted
+            );
+            
+            $_SESSION["message"] = "Excel file uploaded successfully! {$recordsInserted} records processed.";
             $_SESSION["last_upload_timestamp"] = $upload_timestamp;
             $_SESSION["last_upload_ids"] = $inserted_ids;
         } else {
             $_SESSION["error"] = "No records inserted.";
+            
+            // Log failed upload attempt - no records processed
+            logActivity(
+                $conn, 
+                $_SESSION['user_id'] ?? null, 
+                $_SESSION['full_name'] ?? 'Unknown User', 
+                'upload_ror', 
+                "Failed to upload ROR file: {$fileName} - Error: No records processed"
+            );
         }
 
     } catch (Exception $e) {
         $_SESSION["error"] = "Error reading Excel file: " . $e->getMessage();
+        
+        // Log failed upload attempt
+        logActivity(
+            $conn, 
+            $_SESSION['user_id'] ?? null, 
+            $_SESSION['full_name'] ?? 'Unknown User', 
+            'upload_ror', 
+            "Failed to upload ROR file: {$fileName} - Error: " . $e->getMessage()
+        );
     }
 
 } else {
     $_SESSION["error"] = "No file uploaded.";
+    
+    // Log failed upload attempt - no file provided
+    logActivity(
+        $conn, 
+        $_SESSION['user_id'] ?? null, 
+        $_SESSION['full_name'] ?? 'Unknown User', 
+        'upload_ror', 
+        "Failed to upload ROR file - Error: No file uploaded"
+    );
 }
 
 header("Location: uploadData_ui.php");

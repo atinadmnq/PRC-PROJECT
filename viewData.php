@@ -416,10 +416,9 @@ try {
         <nav class="nav-menu">
             <ul class="list-unstyled">
                 <li class="nav-item"><a href="dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
-                
+                    <li class="nav-item"><a href="account.php" class="nav-link"><i class="fas fa-user-cog"></i>Account Settings</a></li>
                     <li class="nav-item"><a href="dashboard.php#register" class="nav-link"><i class="fas fa-user-plus"></i>Register User</a></li>
                     <li class="nav-item"><a href="activity_log.php" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
-                
                 <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload ROR Data</a></li>
                 <li class="nav-item"><a href="viewData.php" class="nav-link active"><i class="fas fa-table"></i>View ROR Data</a></li>
                 <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload RTS Data</a></li>
