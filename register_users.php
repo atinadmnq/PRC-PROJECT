@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once 'activity_logger.php'; // Include the logging functions
 
 // Database configuration
 define('DB_HOST', 'localhost');
@@ -69,21 +70,37 @@ if (isset($_POST['delete_user']) && isset($_POST['user_id'])) {
     // Prevent deletion of current user
     if ($user_id != $_SESSION['user_id']) {
         try {
+            // Get user info before deletion for logging
+            $user_stmt = $pdo->prepare("SELECT full_name, email FROM users WHERE id = ?");
+            $user_stmt->execute([$user_id]);
+            $deleted_user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+            
             $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
             if ($stmt->execute([$user_id])) {
                 $_SESSION['delete_success'] = "User deleted successfully!";
                 
-                // Log the activity
-                $log_stmt = $pdo->prepare("INSERT INTO activity_log (account_name, action, description, created_at) VALUES (?, 'delete', ?, NOW())");
-                $log_stmt->execute([
+                // Log the activity using activity logger
+                logActivity(
+                    $pdo,
+                    $_SESSION['user_id'] ?? null,
                     $_SESSION['full_name'] ?? $_SESSION['email'] ?? 'Admin',
-                    "Deleted user account (ID: $user_id)"
-                ]);
+                    'delete',
+                    "Deleted user account: " . ($deleted_user['full_name'] ?? 'Unknown') . " (" . ($deleted_user['email'] ?? 'Unknown') . ")"
+                );
             } else {
                 $_SESSION['delete_error'] = "Failed to delete user.";
             }
         } catch (PDOException $e) {
             $_SESSION['delete_error'] = "Error deleting user: " . $e->getMessage();
+            
+            // Log failed deletion
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'] ?? null,
+                $_SESSION['full_name'] ?? $_SESSION['email'] ?? 'Admin',
+                'delete',
+                "Failed to delete user (ID: $user_id) - Error: " . $e->getMessage()
+            );
         }
     } else {
         $_SESSION['delete_error'] = "You cannot delete your own account.";
@@ -103,23 +120,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_user'])) {
         $stmt->execute([$email]);
         
         if ($stmt->rowCount() == 0) {
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO users (full_name, email, password, role, created_at) VALUES (?, ?, ?, ?, NOW())");
-            
-            if ($stmt->execute([$full_name, $email, $hashed_password, $role])) {
-                $_SESSION['reg_success'] = "User registered successfully!";
+            try {
+                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $pdo->prepare("INSERT INTO users (full_name, email, password, role, created_at) VALUES (?, ?, ?, ?, NOW())");
                 
-                // Log the activity
-                $log_stmt = $pdo->prepare("INSERT INTO activity_log (full_name, action, description, created_at) VALUES (?, 'delete', ?, NOW())");
-                $log_stmt->execute([
-                    $_SESSION['full_name'] ?? $_SESSION['email'] ?? 'Admin',
-                    "Registered new user: $full_name ($email) as $role"
-                ]);
-            } else {
-                $_SESSION['reg_error'] = "Registration failed. Please try again.";
+                if ($stmt->execute([$full_name, $email, $hashed_password, $role])) {
+                    $_SESSION['reg_success'] = "User registered successfully!";
+                    
+                    // Log user creation using activity logger
+                    logUserCreation(
+                        $pdo, 
+                        $_SESSION['user_id'] ?? null, 
+                        $_SESSION['full_name'] ?? $_SESSION['email'] ?? 'Admin', 
+                        $full_name, 
+                        $email,
+                        $role
+                    );
+                } else {
+                    $_SESSION['reg_error'] = "Registration failed. Please try again.";
+                    
+                    // Log failed registration
+                    logActivity(
+                        $pdo, 
+                        $_SESSION['user_id'] ?? null, 
+                        $_SESSION['full_name'] ?? $_SESSION['email'] ?? 'Admin', 
+                        'create', 
+                        "Failed to register user: $full_name ($email) as $role"
+                    );
+                }
+            } catch (PDOException $e) {
+                $_SESSION['reg_error'] = "Registration failed: " . $e->getMessage();
+                
+                // Log failed registration with error details
+                logActivity(
+                    $pdo, 
+                    $_SESSION['user_id'] ?? null, 
+                    $_SESSION['full_name'] ?? $_SESSION['email'] ?? 'Admin', 
+                    'create', 
+                    "Failed to register user $full_name ($email) as $role - Error: " . $e->getMessage()
+                );
             }
         } else {
             $_SESSION['reg_error'] = "Email already exists.";
+            
+            // Log failed registration attempt
+            logActivity(
+                $pdo, 
+                $_SESSION['user_id'] ?? null, 
+                $_SESSION['full_name'] ?? $_SESSION['email'] ?? 'Admin', 
+                'create', 
+                "Failed to register user $full_name ($email) - Email already exists"
+            );
         }
     } else {
         $_SESSION['reg_error'] = "Please fill in all fields.";
@@ -218,6 +269,7 @@ try {
         <nav class="nav-menu">
             <ul class="list-unstyled">
                 <li class="nav-item"><a href="dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
+                <li class="nav-item"><a href="account.php" class="nav-link"><i class="fas fa-user-cog"></i>Account Settings</a></li>
                 <li class="nav-item"><a href="register_users.php" class="nav-link"> <i class="fas fa-user-plus"></i>Register User</a></li>
                 <li class="nav-item"><a href="activity_log.php" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
                 <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload ROR Data</a></li>
@@ -508,7 +560,6 @@ try {
                     });
                 });
             }
-        });
             
             // Delete modal functionality
             const deleteModal = document.getElementById('deleteModal');

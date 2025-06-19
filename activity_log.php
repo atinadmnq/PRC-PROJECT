@@ -33,33 +33,66 @@ if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
 
 // Handle logout
 if (isset($_GET['logout'])) {
+    // Log logout activity
+    logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'logout', 'User logged out successfully');
     session_destroy();
     header("Location: index.php");
     exit();
 }
 
-// Fetch activity logs
+// Function to log activities
+function logActivity($pdo, $userId, $userName, $action, $description, $additionalData = []) {
+    try {
+        $stmt = $pdo->prepare("INSERT INTO activity_log (user_id, account_name, user_name, activity_type, action, description, ip_address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([
+            $userId,
+            $userName,
+            $userName,
+            $action,
+            $action,
+            $description,
+            $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
+        ]);
+    } catch (PDOException $e) {
+        error_log("Failed to log activity: " . $e->getMessage());
+    }
+}
+
+// Fetch activity logs with enhanced query
 try {
     $activity_logs = $pdo->query("
         SELECT
             al.*,
-            COALESCE(al.user_name, al.account_name, 'Unknown User') as full_name
+            COALESCE(al.user_name, al.account_name, 'Unknown User') as full_name,
+            CASE 
+                WHEN al.action = 'login' THEN 'success'
+                WHEN al.action = 'logout' THEN 'danger'
+                WHEN al.action = 'upload_ror' THEN 'info'
+                WHEN al.action = 'upload_rts' THEN 'warning'
+                WHEN al.action = 'release' THEN 'primary'
+                WHEN al.action = 'create' THEN 'primary'
+                WHEN al.action = 'update' THEN 'warning'
+                WHEN al.action = 'delete' THEN 'danger'
+                ELSE 'secondary'
+            END as badge_class,
+            CASE 
+                WHEN al.action = 'login' THEN 'sign-in-alt'
+                WHEN al.action = 'logout' THEN 'sign-out-alt'
+                WHEN al.action = 'upload_ror' THEN 'file-upload'
+                WHEN al.action = 'upload_rts' THEN 'file-upload'
+                WHEN al.action = 'release' THEN 'paper-plane'
+                WHEN al.action = 'create' THEN 'plus'
+                WHEN al.action = 'update' THEN 'edit'
+                WHEN al.action = 'delete' THEN 'trash'
+                ELSE 'info-circle'
+            END as icon_class
         FROM activity_log al
         ORDER BY al.created_at DESC
         LIMIT 50
     ")->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    try {
-        $activity_logs = $pdo->query("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($activity_logs as &$log) {
-            if (!isset($log['full_name'])) {
-                $log['full_name'] = $log['user_name'] ?? $log['account_name'] ?? 'Unknown User';
-            }
-        }
-    } catch (PDOException $e2) {
-        $activity_logs = [];
-        error_log("Activity log query failed: " . $e2->getMessage());
-    }
+    $activity_logs = [];
+    error_log("Activity log query failed: " . $e->getMessage());
 }
 ?>
 
@@ -79,6 +112,40 @@ try {
             font-family: "Century Gothic";
             margin: 0;
             padding: 0;
+        }
+        
+        .activity-description {
+            max-width: 300px;
+            word-wrap: break-word;
+        }
+        
+        .badge-activity {
+            font-size: 0.85em;
+            padding: 0.4em 0.8em;
+        }
+        
+        .user-avatar-sm {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8rem;
+        }
+        
+        .activity-row:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .filter-section {
+            background: white;
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
     </style>
 </head>
@@ -108,6 +175,11 @@ try {
                 <li class="nav-item">
                     <a href="dashboard.php" class="nav-link">
                         <i class="fas fa-tachometer-alt"></i>Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="account.php" class="nav-link">
+                        <i class="fas fa-user-cog"></i>Account Settings
                     </a>
                 </li>
                 <li class="nav-item">
@@ -149,6 +221,40 @@ try {
             <p class="text-muted">Monitor all system activities and user actions</p>
         </div>
         
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <label for="activityFilter" class="form-label">Filter by Action:</label>
+                    <select class="form-select" id="activityFilter">
+                        <option value="all">All Activities</option>
+                        <option value="login">Login Activities</option>
+                        <option value="logout">Logout Activities</option>
+                        <option value="upload_ror">ROR Uploads</option>
+                        <option value="upload_rts">RTS Uploads</option>
+                        <option value="release">Releases</option>
+                        <option value="create">Create Activities</option>
+                        <option value="update">Update Activities</option>
+                        <option value="delete">Delete Activities</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="dateFilter" class="form-label">Filter by Date:</label>
+                    <input type="date" class="form-control" id="dateFilter">
+                </div>
+                <div class="col-md-4">
+                    <label for="searchFilter" class="form-label">Search:</label>
+                    <input type="text" class="form-control" id="searchFilter" placeholder="Search by user or description...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="button" class="btn btn-outline-secondary d-block w-100" onclick="clearFilters()">
+                        <i class="fas fa-refresh me-1"></i>Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <div class="card dashboard-card">
             <div class="card-header bg-transparent">
                 <div class="row align-items-center">
@@ -156,16 +262,17 @@ try {
                         <h5 class="card-title mb-0">
                             <i class="fas fa-list me-2"></i>Recent Activities
                         </h5>
+                        <small class="text-muted">Showing last 50 activities</small>
                     </div>
                     <div class="col-auto">
-                        <select class="form-select form-select-sm" id="activityFilter">
-                            <option value="all">All Activities</option>
-                            <option value="login">Login Activities</option>
-                            <option value="logout">Logout Activities</option>
-                            <option value="create">Create Activities</option>
-                            <option value="update">Update Activities</option>
-                            <option value="delete">Delete Activities</option>
-                        </select>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-primary btn-sm" onclick="refreshActivityLog()">
+                                <i class="fas fa-sync-alt me-1"></i>Refresh
+                            </button>
+                            <button class="btn btn-outline-success btn-sm" onclick="exportActivityLog()">
+                                <i class="fas fa-download me-1"></i>Export
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -179,12 +286,17 @@ try {
                                 <th><i class="fas fa-cog me-1"></i>Action</th>
                                 <th><i class="fas fa-info-circle me-1"></i>Description</th>
                                 <th><i class="fas fa-clock me-1"></i>Date & Time</th>
+                                <th><i class="fas fa-map-marker-alt me-1"></i>IP Address</th>
                             </tr>
                         </thead>
                         <tbody id="activityTableBody">
                             <?php if (!empty($activity_logs)): ?>
                                 <?php foreach ($activity_logs as $log): ?>
-                                    <tr class="activity-row" data-action="<?php echo $log['action'] ?? ''; ?>">
+                                    <tr class="activity-row" 
+                                        data-action="<?php echo htmlspecialchars($log['action'] ?? ''); ?>"
+                                        data-date="<?php echo isset($log['created_at']) ? date('Y-m-d', strtotime($log['created_at'])) : ''; ?>"
+                                        data-user="<?php echo htmlspecialchars(strtolower($log['full_name'] ?? '')); ?>"
+                                        data-description="<?php echo htmlspecialchars(strtolower($log['description'] ?? '')); ?>">
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <div class="user-avatar-sm me-2">
@@ -198,28 +310,68 @@ try {
                                             </div>
                                         </td>
                                         <td>
-                                            <span class="badge bg-<?php echo ($log['action'] ?? '') == 'login' ? 'success' : (($log['action'] ?? '') == 'logout' ? 'danger' : (($log['action'] ?? '') == 'create' ? 'primary' : (($log['action'] ?? '') == 'update' ? 'warning' : (($log['action'] ?? '') == 'delete' ? 'danger' : 'secondary')))); ?>">
-                                                <i class="fas fa-<?php echo ($log['action'] ?? '') == 'login' ? 'sign-in-alt' : (($log['action'] ?? '') == 'logout' ? 'sign-out-alt' : (($log['action'] ?? '') == 'create' ? 'plus' : (($log['action'] ?? '') == 'update' ? 'edit' : (($log['action'] ?? '') == 'delete' ? 'trash' : 'info-circle')))); ?> me-1"></i>
-                                                <?php echo ucfirst($log['action'] ?? 'Unknown'); ?>
+                                            <span class="badge bg-<?php echo $log['badge_class'] ?? 'secondary'; ?> badge-activity">
+                                                <i class="fas fa-<?php echo $log['icon_class'] ?? 'info-circle'; ?> me-1"></i>
+                                                <?php 
+                                                $actionDisplay = '';
+                                                switch($log['action'] ?? '') {
+                                                    case 'login':
+                                                        $actionDisplay = 'Login';
+                                                        break;
+                                                    case 'logout':
+                                                        $actionDisplay = 'Logout';
+                                                        break;
+                                                    case 'upload_ror':
+                                                        $actionDisplay = 'ROR Upload';
+                                                        break;
+                                                    case 'upload_rts':
+                                                        $actionDisplay = 'RTS Upload';
+                                                        break;
+                                                    case 'release':
+                                                        $actionDisplay = 'Release';
+                                                        break;
+                                                    case 'create':
+                                                        $actionDisplay = 'Create';
+                                                        break;
+                                                    case 'update':
+                                                        $actionDisplay = 'Update';
+                                                        break;
+                                                    case 'delete':
+                                                        $actionDisplay = 'Delete';
+                                                        break;
+                                                    default:
+                                                        $actionDisplay = ucfirst($log['action'] ?? 'Unknown');
+                                                }
+                                                echo $actionDisplay;
+                                                ?>
                                             </span>
                                         </td>
                                         <td>
-                                            <?php echo htmlspecialchars($log['description'] ?? 'No description available'); ?>
+                                            <div class="activity-description">
+                                                <?php echo htmlspecialchars($log['description'] ?? 'No description available'); ?>
+                                            </div>
                                         </td>
                                         <td>
-                                            <small class="text-muted">
-                                                <i class="fas fa-calendar me-1"></i>
-                                                <?php echo isset($log['created_at']) ? date('M j, Y', strtotime($log['created_at'])) : 'Unknown date'; ?>
-                                                <br>
-                                                <i class="fas fa-clock me-1"></i>
-                                                <?php echo isset($log['created_at']) ? date('g:i A', strtotime($log['created_at'])) : 'Unknown time'; ?>
+                                            <div class="text-nowrap">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-calendar me-1"></i>
+                                                    <?php echo isset($log['created_at']) ? date('M j, Y', strtotime($log['created_at'])) : 'Unknown date'; ?>
+                                                    <br>
+                                                    <i class="fas fa-clock me-1"></i>
+                                                    <?php echo isset($log['created_at']) ? date('g:i A', strtotime($log['created_at'])) : 'Unknown time'; ?>
+                                                </small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted font-monospace">
+                                                <?php echo htmlspecialchars($log['ip_address'] ?? 'N/A'); ?>
                                             </small>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="4" class="text-center text-muted py-4">
+                                    <td colspan="5" class="text-center text-muted py-4">
                                         <i class="fas fa-info-circle me-2"></i>No activity logs available
                                     </td>
                                 </tr>
@@ -237,24 +389,101 @@ try {
         document.addEventListener('DOMContentLoaded', function() {
             // Activity log filtering functionality
             const activityFilter = document.getElementById('activityFilter');
-            if (activityFilter) {
-                activityFilter.addEventListener('change', function() {
-                    const filter = this.value;
-                    const activityRows = document.querySelectorAll('.activity-row');
+            const dateFilter = document.getElementById('dateFilter');
+            const searchFilter = document.getElementById('searchFilter');
+            
+            function filterActivities() {
+                const actionFilter = activityFilter.value;
+                const dateFilterValue = dateFilter.value;
+                const searchValue = searchFilter.value.toLowerCase();
+                const activityRows = document.querySelectorAll('.activity-row');
+                
+                activityRows.forEach(row => {
+                    const rowAction = row.getAttribute('data-action');
+                    const rowDate = row.getAttribute('data-date');
+                    const rowUser = row.getAttribute('data-user');
+                    const rowDescription = row.getAttribute('data-description');
                     
-                    activityRows.forEach(row => {
-                        const rowAction = row.getAttribute('data-action');
-                        
-                        // Show row if filter is 'all' or matches the row's action
-                        if (filter === 'all' || rowAction === filter) {
-                            row.style.display = '';
-                        } else {
-                            row.style.display = 'none';
-                        }
-                    });
+                    let showRow = true;
+                    
+                    // Filter by action
+                    if (actionFilter !== 'all' && rowAction !== actionFilter) {
+                        showRow = false;
+                    }
+                    
+                    // Filter by date
+                    if (dateFilterValue && rowDate !== dateFilterValue) {
+                        showRow = false;
+                    }
+                    
+                    // Filter by search term
+                    if (searchValue && 
+                        !rowUser.includes(searchValue) && 
+                        !rowDescription.includes(searchValue)) {
+                        showRow = false;
+                    }
+                    
+                    row.style.display = showRow ? '' : 'none';
                 });
             }
+            
+            // Add event listeners
+            if (activityFilter) {
+                activityFilter.addEventListener('change', filterActivities);
+            }
+            
+            if (dateFilter) {
+                dateFilter.addEventListener('change', filterActivities);
+            }
+            
+            if (searchFilter) {
+                searchFilter.addEventListener('input', filterActivities);
+            }
         });
+        
+        function clearFilters() {
+            document.getElementById('activityFilter').value = 'all';
+            document.getElementById('dateFilter').value = '';
+            document.getElementById('searchFilter').value = '';
+            
+            // Show all rows
+            const activityRows = document.querySelectorAll('.activity-row');
+            activityRows.forEach(row => {
+                row.style.display = '';
+            });
+        }
+        
+        function refreshActivityLog() {
+            location.reload();
+        }
+        
+        function exportActivityLog() {
+            // Create CSV content
+            let csvContent = "User,Action,Description,Date & Time,IP Address\n";
+            
+            const visibleRows = document.querySelectorAll('.activity-row[style=""], .activity-row:not([style])');
+            visibleRows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const user = cells[0].textContent.trim().replace(/\s+/g, ' ');
+                const action = cells[1].textContent.trim().replace(/\s+/g, ' ');
+                const description = cells[2].textContent.trim().replace(/\s+/g, ' ');
+                const dateTime = cells[3].textContent.trim().replace(/\s+/g, ' ');
+                const ipAddress = cells[4].textContent.trim();
+                
+                csvContent += `"${user}","${action}","${description}","${dateTime}","${ipAddress}"\n`;
+            });
+            
+            // Download CSV
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'activity_log_' + new Date().toISOString().split('T')[0] + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
     </script>
 </body>
 </html>
