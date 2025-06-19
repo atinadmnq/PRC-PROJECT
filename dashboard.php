@@ -90,6 +90,35 @@ try {
         error_log("Activity log query failed: " . $e2->getMessage());
     }
 }
+
+$ror_count = 0;
+try {
+    $sql_ror_count = "SELECT COUNT(*) as total_ror FROM roravailable";
+    $result_ror = $pdo->query($sql_ror_count);
+    if ($result_ror) {
+        $row_ror = $result_ror->fetch(PDO::FETCH_ASSOC);
+        $ror_count = $row_ror['total_ror'];
+    }
+} catch (PDOException $e) {
+    error_log("ROR count query failed: " . $e->getMessage());
+    $ror_count = 0;
+}
+
+// Optional: Get RTS count if you have an RTS table
+$rts_count = 0;
+try {
+    // Assuming you have an RTS table - replace 'rts_table_name' with your actual RTS table name
+    $sql_rts_count = "SELECT COUNT(*) as total_rts FROM rts_data_onhold";
+    $result_rts = $pdo->query($sql_rts_count);
+    if ($result_rts) {
+        $row_rts = $result_rts->fetch(PDO::FETCH_ASSOC);
+        $rts_count = $row_rts['total_rts'];
+    }
+} catch (PDOException $e) {
+    // Table might not exist or query failed
+    error_log("RTS count query failed: " . $e->getMessage());
+    $rts_count = 0;
+}
 ?>
 
 <!DOCTYPE html>
@@ -170,16 +199,7 @@ try {
     
     <!-- Main Content -->
     <div class="main-content">
-        <!-- Success/Error Messages -->
-        <?php if (isset($_SESSION['admin_action']) && $_SESSION['admin_action']): ?>
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <i class="fas fa-check-circle me-2"></i>
-                <?php echo $_SESSION['admin_message']; ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            <?php unset($_SESSION['admin_action']); unset($_SESSION['admin_message']); ?>
-        <?php endif; ?>
-
+               
         <!-- Dashboard Section -->
         <div id="dashboard" class="content-section active">
             <div class="page-header">
@@ -190,26 +210,35 @@ try {
             </div>
             
             <div class="row mb-4">
-                <div class="col-md-3 mb-3">
-                    <div class="stats-card">
-                        <div class="mb-2">
-                            <i class="fas fa-file-alt fa-2x"></i>
-                        </div>
-                        <h3>0</h3>
-                        <p class="mb-0 fonty">Total Releases</p>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                        <div class="mb-2">
-                            <i class="fas fa-clock fa-2x"></i>
-                        </div>
-                        <h3>0</h3>
-                        <p class="mb-0 fonty">Files Uploaded</p>
-                    </div>
-                </div>
-
+    <div class="col-md-3 mb-3">
+        <div class="stats-card">
+            <div class="mb-2">
+                <i class="fas fa-file-alt fa-2x"></i>
             </div>
+            <h3><?php echo number_format($rts_count); ?></h3>
+            <p class="mb-0 fonty">Total RTS</p>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="mb-2">
+                <i class="fas fa-clock fa-2x"></i>
+            </div>
+            <h3><?php echo number_format($ror_count); ?></h3>
+            <p class="mb-0 fonty">Total ROR</p>
+        </div>
+    </div>
+    <!-- Add more stats cards if needed -->
+    <div class="col-md-3 mb-3">
+        <div class="stats-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="mb-2">
+                <i class="fas fa-users fa-2x"></i>
+            </div>
+            <h3><?php echo number_format($ror_count + $rts_count); ?></h3>
+            <p class="mb-0 fonty">Total Records</p>
+        </div>
+    </div>
+</div>
             
             <div class="row">
                 <div class="col-md-8">
@@ -253,7 +282,10 @@ try {
                         <div class="card-body">
                             <div class="d-grid gap-2">
                                 <a href="uploadData_ui.php" class="btn btn-outline-primary">
-                                    <i class="fas fa-upload me-2"></i>Upload Files
+                                    <i class="fas fa-upload me-2"></i>Upload ROR
+                                </a>
+                                <a href="rts_ui.php" class="btn btn-outline-primary">
+                                    <i class="fas fa-upload me-2"></i>Upload RTS
                                 </a>
                                 <a href="" class="btn btn-outline-secondary">
                                     <i class="fas fa-download me-2"></i>Export Data
