@@ -283,12 +283,9 @@ include 'db_connect.php';
         <nav class="nav-menu">
             <ul class="list-unstyled">
                 <li class="nav-item"><a href="dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
-                <?php if (($_SESSION['role'] ?? '') === 'admin'): ?>
-                    <li class="nav-item"><a href="dashboard.php#register" class="nav-link"><i class="fas fa-user-plus"></i>Register User</a></li>
-                    <li class="nav-item"><a href="dashboard.php#activity" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
-                <?php endif; ?>
-                <li class="nav-item"><a href="uploadData_ui.php" class="nav-link active"><i class="fas fa-upload"></i>Upload ROR Data</a></li>
-                <li class="nav-item"><a href="viewData.php" class="nav-link active"><i class="fas fa-table"></i>View ROR Data</a></li>
+                <li class="nav-item"><a href="register_users.php" class="nav-link"><i class="fas fa-user-plus"></i>Register User</a></li>
+                <li class="nav-item"><a href="activity_log.php" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>                <li class="nav-item"><a href="uploadData_ui.php" class="nav-link "><i class="fas fa-upload"></i>Upload ROR Data</a></li>
+                <li class="nav-item"><a href="viewData.php" class="nav-link"><i class="fas fa-table"></i>View ROR Data</a></li>
                 <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload RTS Data</a></li>
                 <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
@@ -356,94 +353,7 @@ include 'db_connect.php';
         </div>
     </div>
 
-    <!-- Activity Log Section -->
-        <div id="activity" class="content-section">
-            <div class="page-header">
-                <h1 class="page-title"><i class="fas fa-history me-3"></i>Activity Log</h1>
-                <p class="text-muted">Monitor all system activities and user actions</p>
-            </div>
-
-            <div class="card dashboard-card">
-                <div class="card-header bg-transparent">
-                    <div class="row align-items-center">
-                        <div class="col">
-                            <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>Recent Activities</h5>
-                        </div>
-                        <div class="col-auto">
-                            <select class="form-select form-select-sm" id="activityFilter">
-                                <option value="all">All Activities</option>
-                                <option value="login">Login Activities</option>
-                                <option value="logout">Logout Activities</option>
-                                <option value="create">Create Activities</option>
-                                <option value="update">Update Activities</option>
-                                <option value="delete">Delete Activities</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th><i class="fas fa-user me-1"></i>User</th>
-                                    <th><i class="fas fa-cog me-1"></i>Action</th>
-                                    <th><i class="fas fa-info-circle me-1"></i>Description</th>
-                                    <th><i class="fas fa-clock me-1"></i>Date & Time</th>
-                                </tr>
-                            </thead>
-                            <tbody id="activityTableBody">
-    <?php if (!empty($activity_logs)): ?>
-        <?php foreach ($activity_logs as $log): ?>
-        <tr class="activity-row" data-action="<?php echo $log['action'] ?? ''; ?>">
-            <td>
-                <div class="d-flex align-items-center">
-                    <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
-                    <div>
-                        <div class="fw-medium"><?php echo htmlspecialchars($log['full_name'] ?? 'Unknown User'); ?></div>
-                    </div>
-                </div>
-            </td>
-            <td>
-                <span class="badge bg-<?php 
-                    echo ($log['action'] ?? '') == 'login' ? 'success' : 
-                        (($log['action'] ?? '') == 'logout' ? 'danger' : 
-                        (($log['action'] ?? '') == 'create' ? 'primary' : 
-                        (($log['action'] ?? '') == 'update' ? 'warning' : 
-                        (($log['action'] ?? '') == 'delete' ? 'danger' : 'secondary')))); 
-                ?>">
-                    <i class="fas fa-<?php 
-                        echo ($log['action'] ?? '') == 'login' ? 'sign-in-alt' : 
-                            (($log['action'] ?? '') == 'logout' ? 'sign-out-alt' : 
-                            (($log['action'] ?? '') == 'create' ? 'plus' : 
-                            (($log['action'] ?? '') == 'update' ? 'edit' : 
-                            (($log['action'] ?? '') == 'delete' ? 'trash' : 'info-circle')))); 
-                    ?> me-1"></i><?php echo ucfirst($log['action'] ?? 'Unknown'); ?>
-                </span>
-            </td>
-            <td><?php echo htmlspecialchars($log['description'] ?? 'No description available'); ?></td>
-            <td>
-                <small class="text-muted">
-                    <i class="fas fa-calendar me-1"></i><?php echo isset($log['created_at']) ? date('M j, Y', strtotime($log['created_at'])) : 'Unknown date'; ?><br>
-                    <i class="fas fa-clock me-1"></i><?php echo isset($log['created_at']) ? date('g:i A', strtotime($log['created_at'])) : 'Unknown time'; ?>
-                </small>
-            </td>
-        </tr>
-        <?php endforeach; ?>
-    <?php else: ?>
-        <tr>
-            <td colspan="4" class="text-center text-muted py-4">
-                <i class="fas fa-info-circle me-2"></i>No activity logs available
-            </td>
-        </tr>
-    <?php endif; ?>
-</tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+   
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>

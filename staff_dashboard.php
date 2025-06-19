@@ -59,25 +59,33 @@ try {
         error_log("Activity log query failed: " . $e2->getMessage());
     }
 }
-
-// Function to check user permissions 
-function hasPermission($pdo, $user_email, $permission_type) {
-    $stmt = $pdo->prepare("
-        SELECT id FROM user_permissions 
-        WHERE user_email = ? AND permission_type = ? AND status = 'active'
-    ");
-    $stmt->execute([$user_email, $permission_type]);
-    return $stmt->rowCount() > 0;
+$ror_count = 0;
+try {
+    $sql_ror_count = "SELECT COUNT(*) as total_ror FROM roravailable";
+    $result_ror = $pdo->query($sql_ror_count);
+    if ($result_ror) {
+        $row_ror = $result_ror->fetch(PDO::FETCH_ASSOC);
+        $ror_count = $row_ror['total_ror'];
+    }
+} catch (PDOException $e) {
+    error_log("ROR count query failed: " . $e->getMessage());
+    $ror_count = 0;
 }
-// 4. Function to get user's permissions (for display purposes)
-function getUserPermissions($pdo, $user_email) {
-    $stmt = $pdo->prepare("
-        SELECT permission_type, granted_at, granted_by 
-        FROM user_permissions 
-        WHERE user_email = ? AND status = 'active'
-    ");
-    $stmt->execute([$user_email]);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Optional: Get RTS count if you have an RTS table
+$rts_count = 0;
+try {
+    // Assuming you have an RTS table - replace 'rts_table_name' with your actual RTS table name
+    $sql_rts_count = "SELECT COUNT(*) as total_rts FROM rts_data_onhold";
+    $result_rts = $pdo->query($sql_rts_count);
+    if ($result_rts) {
+        $row_rts = $result_rts->fetch(PDO::FETCH_ASSOC);
+        $rts_count = $row_rts['total_rts'];
+    }
+} catch (PDOException $e) {
+    // Table might not exist or query failed
+    error_log("RTS count query failed: " . $e->getMessage());
+    $rts_count = 0;
 }
 ?>
 <!DOCTYPE html>
@@ -282,7 +290,37 @@ function getUserPermissions($pdo, $user_email) {
                 <h1 class="page-title"><i class="fas fa-tachometer-alt me-3"></i>Staff Dashboard</h1>
                 <p class="text-muted">Report of Rating Issuance Logistics and Inventory System</p>
             </div>
-            
+
+               <div class="row mb-4">
+             <div class="col-md-3 mb-3">
+        <div class="stats-card">
+            <div class="mb-2">
+                <i class="fas fa-file-alt fa-2x"></i>
+            </div>
+            <h3><?php echo number_format($rts_count); ?></h3>
+            <p class="mb-0 fonty">Total RTS</p>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="mb-2">
+                <i class="fas fa-clock fa-2x"></i>
+            </div>
+            <h3><?php echo number_format($ror_count); ?></h3>
+            <p class="mb-0 fonty">Total ROR</p>
+        </div>
+    </div>
+    <!-- Add more stats cards if needed -->
+    <div class="col-md-3 mb-3">
+        <div class="stats-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="mb-2">
+                <i class="fas fa-users fa-2x"></i>
+            </div>
+            <h3><?php echo number_format($ror_count + $rts_count); ?></h3>
+            <p class="mb-0 fonty">Total Records</p>
+        </div>
+    </div>
+</div>
             <div class="row">
                 <div class="col-md-8">
                     <div class="card dashboard-card">
