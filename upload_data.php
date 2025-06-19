@@ -23,7 +23,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
             "Failed to upload ROR file: {$fileName} - Error: File not found"
         );
         
-        header("Location: update_data.php");
+        header("Location: uploadData_ui.php");
         exit();
     }
     
@@ -64,7 +64,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         }
 
         if ($recordsInserted > 0) {
-            // Log successful ROR upload
+            // Log successful ROR upload using the specialized function
             logRORUpload(
                 $conn, 
                 $_SESSION['user_id'] ?? null, 
@@ -92,7 +92,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
     } catch (Exception $e) {
         $_SESSION["error"] = "Error reading Excel file: " . $e->getMessage();
         
-        // Log failed upload attempt
+        // Log failed upload attempt with exception details
         logActivity(
             $conn, 
             $_SESSION['user_id'] ?? null, 

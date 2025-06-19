@@ -1,6 +1,7 @@
 <!-- staff_dashboard.php -->
 <?php
 session_start();
+require_once 'activity_logger.php'; 
 
 // Database connection
 define('DB_HOST', 'localhost');
