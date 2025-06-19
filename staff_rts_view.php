@@ -463,27 +463,44 @@ try {
                                         <th><i class="fas fa-calendar me-1"></i>Exam Date</th>
                                         <th><i class="fas fa-clock me-1"></i>Upload Timestamp</th>
                                         <th><i class="fas fa-info-circle me-1"></i>Status</th>
+                                        <th><i class="fas fa-cog me-1"></i>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($data as $row): ?>
                                         <tr>
-                                            <td><strong><?= htmlspecialchars($row['id']) ?></strong></td>
-                                            <td><?= htmlspecialchars($row['name']) ?></td>
-                                            <td>
-                                                <span class="badge bg-info"><?= htmlspecialchars($row['examination']) ?></span>
-                                            </td>
-                                            <td><?= htmlspecialchars($row['exam_date']) ?></td>
-                                            <td>
-                                                <small class="text-muted">
-                                                    <?= htmlspecialchars(date("M d, Y", strtotime($row['upload_timestamp']))) ?><br>
-                                                    <?= htmlspecialchars(date("h:i A", strtotime($row['upload_timestamp']))) ?>
-                                                </small>
-                                            </td>
-                                            <td>
-                                                <span class="badge bg-warning"><?= htmlspecialchars($row['status']) ?></span>
-                                            </td>
-                                        </tr>
+                                        <td><?= htmlspecialchars($row['id']) ?></td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
+                                                <span class="fw-medium"><?= htmlspecialchars($row['name']) ?></span>
+                                            </div>
+                                        </td>
+                                        <td><?= htmlspecialchars($row['examination']) ?></td>
+                                        <td>
+                                            <i class="fas fa-calendar-alt me-1 text-muted"></i>
+                                            <?= htmlspecialchars($row['exam_date']) ?>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">
+                                                <i class="fas fa-clock me-1"></i>
+                                                <?= htmlspecialchars(date("M-d-Y H:i:s", strtotime($row['upload_timestamp']))) ?>
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">
+                                                <?= htmlspecialchars($row['status']) ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <form method="post" action="" onsubmit="return confirm('Are you sure you want to release (delete) this record?');" class="d-inline">
+                                                <input type="hidden" name="release_id" value="<?= htmlspecialchars($row['id']) ?>">
+                                                <button type="submit" class="btn btn-danger btn-sm">
+                                                    <i class="fas fa-trash me-1"></i>Release
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
