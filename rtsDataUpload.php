@@ -1,4 +1,3 @@
-<!-- rtsDataUpload.php-->
 <?php
 session_start();
 include 'db_connect.php';
@@ -12,7 +11,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
     
     if (!file_exists($file)) {
         $_SESSION["error"] = "File not found.";
-        header("Location: rtsDataUpload.php");
+        header("Location: update_data.php");
         exit();
     }
     
@@ -69,6 +68,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
     $_SESSION["error"] = "No file uploaded.";
 }
 
-header("Location: uploadData_ui.php");
+header("Location: rts_ui.php");
 exit();
 ?>
