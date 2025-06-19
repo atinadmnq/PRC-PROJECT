@@ -2,7 +2,7 @@
 session_start();
 include 'db_connect.php';
 
-require 'vendor/autoload.php'; // PhpSpreadsheet
+require 'vendor/autoload.php'; 
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
@@ -52,7 +52,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         }
 
         if ($recordsInserted > 0) {
-            // logActivity("Uploaded ROR Excel with $recordsInserted records (Timestamp: $upload_timestamp)", "admin");
+            // logActivity("Uploaded RTS Excel with $recordsInserted records (Timestamp: $upload_timestamp)", "admin");
             $_SESSION["message"] = "Excel file uploaded successfully!";
             $_SESSION["last_upload_timestamp"] = $upload_timestamp;
             $_SESSION["last_upload_ids"] = $inserted_ids;

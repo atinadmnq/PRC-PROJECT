@@ -2,7 +2,7 @@
 session_start();
 include 'db_connect.php';
 
-require 'vendor/autoload.php'; // PhpSpreadsheet
+require 'vendor/autoload.php'; 
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
