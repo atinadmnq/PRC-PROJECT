@@ -2,6 +2,7 @@
 <?php
 session_start();
 include 'db_connect.php';
+require_once 'activity_logger.php'; 
 
 ?>
 <!DOCTYPE html>

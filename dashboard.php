@@ -67,7 +67,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_user'])) {
     }
 }
 
-// Fetch activity logs
+// Function to get recent activities
+function getRecentActivities($pdo, $limit = 5) {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 
+                al.*,
+                COALESCE(al.user_name, al.account_name, 'Unknown User') as full_name
+            FROM activity_log al
+            ORDER BY al.created_at DESC
+            LIMIT ?
+        ");
+        $stmt->execute([$limit]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // Fallback query if the above fails
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?");
+            $stmt->execute([$limit]);
+            $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Add full_name if not present
+            foreach ($activities as &$activity) {
+                if (!isset($activity['full_name'])) {
+                    $activity['full_name'] = $activity['user_name'] ?? $activity['account_name'] ?? 'Unknown User';
+                }
+            }
+            return $activities;
+        } catch (PDOException $e2) {
+            error_log("Recent activities query failed: " . $e2->getMessage());
+            return [];
+        }
+    }
+}
+
+// Fetch activity logs for main display
 try {
     $activity_logs = $pdo->query("
         SELECT
@@ -119,6 +153,9 @@ try {
     error_log("RTS count query failed: " . $e->getMessage());
     $rts_count = 0;
 }
+
+// Get recent activities for dashboard display
+$recentActivities = getRecentActivities($pdo, 5);
 ?>
 
 <!DOCTYPE html>
@@ -137,6 +174,74 @@ try {
             font-family: "Century Gothic";
             margin: 0;
             padding: 0;
+        }
+        
+        /* Activity Timeline Styles */
+        .activity-timeline {
+            position: relative;
+            padding-left: 0;
+        }
+        
+        .activity-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            transition: all 0.3s ease;
+        }
+        
+        .activity-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            background: #007bff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        
+        .activity-icon i {
+            color: white;
+            font-size: 16px;
+        }
+        
+        .activity-content {
+            flex: 1;
+        }
+        
+        .activity-text {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .activity-time {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        /* Action-specific icon colors */
+        .activity-item[data-action="login"] .activity-icon {
+            background: #28a745;
+        }
+        
+        .activity-item[data-action="logout"] .activity-icon {
+            background: #dc3545;
+        }
+        
+        .activity-item[data-action="upload_ror"] .activity-icon,
+        .activity-item[data-action="upload_rts"] .activity-icon {
+            background: #17a2b8;
         }
     </style>
 </head>
@@ -187,64 +292,82 @@ try {
             </div>
             
             <div class="row mb-4">
-    <div class="col-md-3 mb-3">
-        <div class="stats-card">
-            <div class="mb-2">
-                <i class="fas fa-file-alt fa-2x"></i>
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card">
+                        <div class="mb-2">
+                            <i class="fas fa-file-alt fa-2x"></i>
+                        </div>
+                        <h3><?php echo number_format($rts_count); ?></h3>
+                        <p class="mb-0 fonty">Total RTS</p>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <div class="mb-2">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                        <h3><?php echo number_format($ror_count); ?></h3>
+                        <p class="mb-0 fonty">Total ROR</p>
+                    </div>
+                </div>
+                <!-- Add more stats cards if needed -->
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <div class="mb-2">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                        <h3><?php echo number_format($ror_count + $rts_count); ?></h3>
+                        <p class="mb-0 fonty">Total Records</p>
+                    </div>
+                </div>
             </div>
-            <h3><?php echo number_format($rts_count); ?></h3>
-            <p class="mb-0 fonty">Total RTS</p>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
-        <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-            <div class="mb-2">
-                <i class="fas fa-clock fa-2x"></i>
-            </div>
-            <h3><?php echo number_format($ror_count); ?></h3>
-            <p class="mb-0 fonty">Total ROR</p>
-        </div>
-    </div>
-    <!-- Add more stats cards if needed -->
-    <div class="col-md-3 mb-3">
-        <div class="stats-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-            <div class="mb-2">
-                <i class="fas fa-users fa-2x"></i>
-            </div>
-            <h3><?php echo number_format($ror_count + $rts_count); ?></h3>
-            <p class="mb-0 fonty">Total Records</p>
-        </div>
-    </div>
-</div>
             
             <div class="row">
                 <div class="col-md-8">
+                    <!-- Enhanced Recent Activities Section -->
                     <div class="card dashboard-card">
-                        <div class="card-header bg-transparent">
+                        <div class="card-header">
                             <h5 class="card-title mb-0">
-                                <i class="fas fa-history me-2"></i>Recent Activity
+                                <i class="fas fa-clock me-2"></i>Recent Activities
                             </h5>
                         </div>
                         <div class="card-body">
-                            <div class="list-group list-group-flush">
-                                <?php if (!empty($activity_logs)): ?>
-                                    <?php foreach(array_slice($activity_logs, 0, 5) as $log): ?>
-                                        <div class="list-group-item d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <i class="fas fa-<?php echo ($log['action'] ?? '') == 'login' ? 'sign-in-alt' : (($log['action'] ?? '') == 'logout' ? 'sign-out-alt' : 'info-circle'); ?> text-<?php echo ($log['action'] ?? '') == 'login' ? 'success' : (($log['action'] ?? '') == 'logout' ? 'danger' : 'primary'); ?> me-2"></i>
-                                                <?php echo htmlspecialchars($log['description'] ?? 'No description available'); ?>
+                            <?php if (!empty($recentActivities)): ?>
+                                <div class="activity-timeline">
+                                    <?php foreach ($recentActivities as $activity): ?>
+                                        <div class="activity-item" data-action="<?php echo htmlspecialchars($activity['action'] ?? ''); ?>">
+                                            <div class="activity-icon">
+                                                <i class="fas fa-<?php 
+                                                    $action = $activity['action'] ?? '';
+                                                    echo $action === 'login' ? 'sign-in-alt' : 
+                                                         ($action === 'logout' ? 'sign-out-alt' : 
+                                                         ($action === 'upload_ror' ? 'file-upload' : 
+                                                         ($action === 'upload_rts' ? 'cloud-upload-alt' : 'info-circle'))); 
+                                                ?>"></i>
                                             </div>
-                                            <small class="text-muted">
-                                                <?php echo isset($log['created_at']) ? date('M j, g:i A', strtotime($log['created_at'])) : 'Unknown time'; ?>
-                                            </small>
+                                            <div class="activity-content">
+                                                <div class="activity-text">
+                                                    <strong><?php echo htmlspecialchars($activity['full_name']); ?></strong>
+                                                    <?php echo htmlspecialchars($activity['description'] ?? 'No description available'); ?>
+                                                </div>
+                                                <div class="activity-time">
+                                                    <?php echo isset($activity['created_at']) ? date('M j, Y g:i A', strtotime($activity['created_at'])) : 'Unknown time'; ?>
+                                                </div>
+                                            </div>
                                         </div>
                                     <?php endforeach; ?>
-                                <?php else: ?>
-                                    <div class="list-group-item text-center text-muted">
-                                        <i class="fas fa-info-circle me-2"></i>No recent activities to display
-                                    </div>
-                                <?php endif; ?>
-                            </div>
+                                </div>
+                                <div class="text-center mt-3">
+                                    <a href="activity_log.php" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-list me-1"></i>View All Activities
+                                    </a>
+                                </div>
+                            <?php else: ?>
+                                <div class="text-center text-muted py-4">
+                                    <i class="fas fa-info-circle fa-2x mb-3"></i>
+                                    <p class="mb-0">No recent activities to display</p>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -359,7 +482,7 @@ try {
                 </div>
             </div>
         </div>
-
+    </div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

@@ -2,6 +2,8 @@
 <?php
 session_start();
 include 'db_connect.php';
+require_once 'activity_logger.php'; // Include the logging functions
+
 
 // Database connection
 define('DB_HOST', 'localhost');

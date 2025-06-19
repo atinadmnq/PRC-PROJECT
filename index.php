@@ -36,8 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                 $_SESSION['full_name'] = $user['full_name'];
                 $_SESSION['account_name'] = $user['full_name'] ?? $user['email'];
                 
-                // Log successful login with all required parameters
-                logActivity($pdo, $user['id'], $user['full_name'], $user['role'], 'login');
+                // Log successful login with new function
+                logLoginActivity($pdo, $user['id'], $user['full_name'], true);
                 
                 // Redirect based on role
                 if ($user['role'] == 'admin') {
@@ -49,16 +49,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                 }
                 exit();
             } else {
-                // Failed login
+                // Failed login - Log with new function
+                logLoginActivity($pdo, null, $email, false);
                 $error_message = "Invalid email or password.";
-                
-                // Log failed login attempt
-                logActivity($pdo, null, $email, null, 'login_failed');
             }
             
         } catch (Exception $e) {
-            // Log login error
-            logActivity($pdo, null, $email, null, 'login_error');
+            // Log login error with general logActivity function
+            logActivity($pdo, null, $email, 'login', "Login system error - " . $e->getMessage());
             $error_message = "Login system error. Please try again.";
         }
     } else {
