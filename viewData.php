@@ -239,8 +239,22 @@ try {
         
         .main-content {
             margin-left: 280px;
+            margin-right: 320px;
             min-height: 100vh;
             padding: 30px;
+        }
+        
+        .right-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            height: 100vh;
+            width: 320px;
+            background: white;
+            border-left: 1px solid #e9ecef;
+            z-index: 999;
+            overflow-y: auto;
+            padding: 30px 20px;
         }
         
         .content-section {
@@ -274,6 +288,7 @@ try {
             border-radius: 10px;
             padding: 20px;
             text-align: center;
+            margin-bottom: 15px;
         }
         
         .stat-value {
@@ -285,6 +300,31 @@ try {
         .stat-label {
             color: #6c757d;
             font-size: 0.9rem;
+        }
+        
+        .exam-count-item {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .exam-count-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: #495057;
+        }
+        
+        .exam-count-badge {
+            background: #4285f4;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
         }
         
         .user-avatar-sm {
@@ -309,6 +349,11 @@ try {
             
             .main-content {
                 margin-left: 0;
+                margin-right: 0;
+            }
+            
+            .right-panel {
+                display: none;
             }
         }
     </style>
@@ -338,41 +383,30 @@ try {
         </nav>
     </div>
     
+    <!-- Right Side Panel for Summary -->
+    <div class="right-panel">
+        <h5 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Summary of Uploaded Data</h5>
+        
+        <div class="stat-card text-center">
+            <div class="stat-value text-primary"><?= $total_count ?></div>
+            <div class="stat-label">Total Records (All Examinations)</div>
+        </div>
+        
+        <h6 class="mb-3 mt-4"><i class="fas fa-list me-2"></i>Records by Examination</h6>
+        <?php foreach ($exam_counts as $exam_name => $count): ?>
+            <div class="exam-count-item">
+                <div class="exam-count-name"><?= htmlspecialchars($exam_name) ?></div>
+                <div class="exam-count-badge"><?= $count ?></div>
+            </div>
+        <?php endforeach; ?>
+    </div>
+    
     <div class="main-content">
         <!-- Main ROR Data View Section -->
         <div id="ror-data" class="content-section active">
             <div class="page-header">
                 <h1 class="page-title"><i class="fas fa-table me-3"></i>View Uploaded ROR Data</h1>
                 <p class="text-muted">Report of Rating Issuance Logistics and Inventory System</p>
-            </div>
-
-            <!-- Summary Card -->
-            <div class="card dashboard-card mb-4">
-                <div class="card-header bg-transparent">
-                    <h5 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Summary of Uploaded Data</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="stat-card text-center">
-                                <div class="stat-value text-primary"><?= $total_count ?></div>
-                                <div class="stat-label">Total Records (All Examinations)</div>
-                            </div>
-                        </div>
-                        <div class="col-md-8">
-                            <div class="row">
-                                <?php foreach ($exam_counts as $exam_name => $count): ?>
-                                    <div class="col-sm-6 mb-2">
-                                        <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
-                                            <span class="fw-medium"><?= htmlspecialchars($exam_name) ?></span>
-                                            <span class="badge bg-primary"><?= $count ?></span>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <!-- Filter Card -->

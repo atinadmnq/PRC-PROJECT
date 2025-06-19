@@ -201,8 +201,22 @@ if ($exam !== '') {
         
         .main-content {
             margin-left: 280px;
+            margin-right: 320px;
             min-height: 100vh;
             padding: 30px;
+        }
+        
+        .right-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            height: 100vh;
+            width: 320px;
+            background: white;
+            border-left: 1px solid #e9ecef;
+            z-index: 999;
+            overflow-y: auto;
+            padding: 30px 20px;
         }
         
         .dashboard-card {
@@ -223,12 +237,23 @@ if ($exam !== '') {
             color: #2c3e50;
         }
 
-        .summary-card {
-            background: linear-gradient(135deg,rgb(59, 82, 182) 0%,rgb(75, 120, 162) 100%);
-            color: white;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 30px;
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
         }
 
         .filter-card {
@@ -305,24 +330,28 @@ if ($exam !== '') {
         }
 
         .exam-count-item {
-            background: rgba(255,255,255,0.1);
-            border-radius: 8px;
-            padding: 10px 15px;
-            margin-bottom: 8px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
         }
-
+        
         .exam-count-name {
-            font-weight: 600;
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: #495057;
         }
-
-        .exam-count-number {
-            background: rgba(255,255,255,0.2);
-            border-radius: 20px;
-            padding: 4px 12px;
-            font-weight: 700;
+        
+        .exam-count-badge {
+            background: #4285f4;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
         }
 
         @media (max-width: 768px) {
@@ -336,6 +365,11 @@ if ($exam !== '') {
             
             .main-content {
                 margin-left: 0;
+                margin-right: 0;
+            }
+            
+            .right-panel {
+                display: none;
             }
         }
     </style>
@@ -366,36 +400,34 @@ if ($exam !== '') {
         </nav>
     </div>
     
+    <!-- Right Side Panel for Summary -->
+    <div class="right-panel">
+        <h5 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Summary of RTS Data</h5>
+        
+        <div class="stat-card text-center">
+            <div class="stat-value text-primary"><?= $total_count ?></div>
+            <div class="stat-label">Total Records (All Examinations)</div>
+        </div>
+        
+        <h6 class="mb-3 mt-4"><i class="fas fa-list me-2"></i>Records by Examination</h6>
+        <?php if (!empty($exam_counts)): ?>
+            <?php foreach ($exam_counts as $exam_name => $count): ?>
+                <div class="exam-count-item">
+                    <div class="exam-count-name"><?= htmlspecialchars($exam_name) ?></div>
+                    <div class="exam-count-badge"><?= $count ?></div>
+                </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <div class="text-muted text-center py-3">
+                <i class="fas fa-info-circle me-1"></i>No RTS data available
+            </div>
+        <?php endif; ?>
+    </div>
+    
     <div class="main-content">
         <div class="page-header">
             <h1 class="page-title"><i class="fas fa-table me-3"></i>View Uploaded RTS Data</h1>
             <p class="text-muted">Manage and review uploaded RTS examination data</p>
-        </div>
-
-        <!-- Summary Card -->
-        <div class="summary-card">
-            <h4 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Data Summary</h4>
-            <div class="row">
-                <div class="col-md-4">
-                    <div class="text-center">
-                        <h2 class="mb-0"><?= $total_count ?></h2>
-                        <p class="mb-0">Total Records</p>
-                    </div>
-                </div>
-                <div class="col-md-8">
-                    <h6 class="mb-3">Records by Examination:</h6>
-                    <div class="row">
-                        <?php foreach ($exam_counts as $exam_name => $count): ?>
-                            <div class="col-md-6 mb-2">
-                                <div class="exam-count-item">
-                                    <span class="exam-count-name"><?= htmlspecialchars($exam_name) ?></span>
-                                    <span class="exam-count-number"><?= $count ?></span>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- Filter Card -->
