@@ -376,7 +376,7 @@ try {
                 <li class="nav-item"><a href="staff_dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
                 <li class="nav-item"><button class="nav-link" data-section="activity"><i class="fas fa-history"></i>Activity Log</button></li>
                 <li class="nav-item"><button class="nav-link active" data-section="rts-table"><i class="fas fa-table"></i>RTS Table View</button></li>
-                <li class="nav-item"><a href="viewData.php" class="nav-link"><i class="fas fa-table"></i>ROR Table View</a></li>
+                <li class="nav-item"><a href="staff_viewData.php" class="nav-link"><i class="fas fa-table"></i>ROR Table View</a></li>
                 <li class="nav-item"><a href="staff_dashboard.php?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>
