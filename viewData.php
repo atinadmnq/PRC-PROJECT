@@ -195,8 +195,8 @@ try {
             font-size: 1.5rem;
         }
         
-        .user-name {
-            font-weight: 600;
+       .user-name {
+            font-weight: normal;
             margin-bottom: 5px;
         }
         
@@ -356,29 +356,70 @@ try {
                 display: none;
             }
         }
+        .filter-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .form-control, .form-select {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            padding: 12px 15px;
+            font-family: "Century Gothic";
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 25px;
+            font-family: "Century Gothic";
+            font-weight: 600;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 <body>
     <div class="sidebar">
         <div class="sidebar-header">
-            <a href="#" class="sidebar-brand">
+            <a href="dashboard.php" class="sidebar-brand">
                 <img src="img/rilis-logo.png" alt="RILIS" style="height: 35px; margin-right: 3px;">
                 RILIS
             </a>
         </div>
-        <div class="user-info">
-            <div class="user-avatar"><i class="fas fa-user"></i></div>
-            <div class="user-name"><?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['email'] ?? 'User'); ?></div>
+      <div class="user-info">
+            <div class="user-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="user-name">
+                <?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['email'] ?? 'User'); ?>
+            </div>
             <small class="text-light"><?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?></small>
-            <small class="text-light">Staff Member</small>
+            <small class="text-light">Administrator</small>
         </div>
         <nav class="nav-menu">
             <ul class="list-unstyled">
                 <li class="nav-item"><a href="dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
-                <li class="nav-item"><button class="nav-link" data-section="activity"><i class="fas fa-history"></i>Activity Log</button></li>
-                <li class="nav-item"><a href="viewData.php" class="nav-link active"><i class="fas fa-table"></i>ROR Table View</a></li>
-                <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-table"></i>Upload RTS</a></li>
-                <li class="nav-item"><a href="staff_dashboard.php?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
+                <?php if (($_SESSION['role'] ?? '') === 'admin'): ?>
+                    <li class="nav-item"><a href="dashboard.php#register" class="nav-link"><i class="fas fa-user-plus"></i>Register User</a></li>
+                    <li class="nav-item"><a href="dashboard.php#activity" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
+                <?php endif; ?>
+                <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload ROR Data</a></li>
+                <li class="nav-item"><a href="viewData.php" class="nav-link active"><i class="fas fa-table"></i>View ROR Data</a></li>
+                <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload RTS Data</a></li>
+                <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>
     </div>
@@ -410,36 +451,30 @@ try {
             </div>
 
             <!-- Filter Card -->
-            <div class="card dashboard-card mb-4">
-                <div class="card-header bg-transparent">
-                    <h5 class="card-title mb-0"><i class="fas fa-filter me-2"></i>Filter Data</h5>
-                </div>
-                <div class="card-body">
-                    <form method="get" action="" id="filterForm">
-                        <div class="row align-items-end">
-                            <div class="col-md-4">
-                                <label for="examSelect" class="form-label">Select Examination:</label>
-                                <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
-                                    <option value="">Choose an examination</option>
-                                    <?php foreach ($examinations as $examination): ?>
-                                        <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($examination) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="searchName" class="form-label">Search Name:</label>
-                                <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
-                            </div>
-                            <div class="col-md-4">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-search me-2"></i>Search
-                                </button>
-                            </div>
+            <div class="filter-card">
+                <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
+                <form method="get" action="" id="filterForm">
+                    <div class="row align-items-end">
+                        <div class="col-md-4">
+                            <label for="examSelect" class="form-label"><i class="fas fa-graduation-cap me-1"></i>Select Examination</label>
+                            <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
+                                <option value="">-- Choose an examination --</option>
+                                <?php foreach ($examinations as $examination): ?>
+                                    <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($examination) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
-                    </form>
-                </div>
+                        <div class="col-md-4">
+                            <label for="searchName" class="form-label"><i class="fas fa-search me-1"></i>Search Name</label>
+                            <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-2"></i>Search</button>
+                        </div>
+                    </div>
+                </form>
             </div>
 
             <!-- Data Table Card -->

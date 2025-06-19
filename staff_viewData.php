@@ -1,4 +1,4 @@
-<!-- viewData.php -->
+<!-- staff_viewData.php -->
 <?php
 session_start();
 
@@ -245,8 +245,22 @@ if ($exam !== '') {
         
         .main-content {
             margin-left: 280px;
+            margin-right: 320px;
             min-height: 100vh;
             padding: 30px;
+        }
+        
+        .right-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            height: 100vh;
+            width: 320px;
+            background: white;
+            border-left: 1px solid #e9ecef;
+            z-index: 999;
+            overflow-y: auto;
+            padding: 30px 20px;
         }
         
         .content-section {
@@ -275,14 +289,83 @@ if ($exam !== '') {
             color: #2c3e50;
         }
         
+        .stat-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
         .stat-value {
             font-size: 2rem;
             font-weight: 700;
+            margin-bottom: 5px;
         }
         
         .stat-label {
-            font-size: 0.875rem;
-            opacity: 0.9;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .exam-count-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .exam-count-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: #495057;
+        }
+        
+        .exam-count-badge {
+            background: #4285f4;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        /* Updated Filter Card Styles (from RTS view) */
+        .filter-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .form-control, .form-select {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            padding: 12px 15px;
+            font-family: "Century Gothic";
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px 25px;
+            font-family: "Century Gothic";
+            font-weight: 600;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+            transform: translateY(-1px);
         }
     </style>
 </head>
@@ -311,6 +394,24 @@ if ($exam !== '') {
         </nav>
     </div>
     
+    <!-- Right Side Panel for Summary -->
+    <div class="right-panel">
+        <h5 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Summary of Uploaded Data</h5>
+        
+        <div class="stat-card text-center">
+            <div class="stat-value text-primary"><?= $total_count ?></div>
+            <div class="stat-label">Total Records (All Examinations)</div>
+        </div>
+        
+        <h6 class="mb-3 mt-4"><i class="fas fa-list me-2"></i>Records by Examination</h6>
+        <?php foreach ($exam_counts as $exam_name => $count): ?>
+            <div class="exam-count-item">
+                <div class="exam-count-name"><?= htmlspecialchars($exam_name) ?></div>
+                <div class="exam-count-badge"><?= $count ?></div>
+            </div>
+        <?php endforeach; ?>
+    </div>
+    
     <div class="main-content">
         <!-- ROR Data Section -->
         <div id="ror-data" class="content-section active">
@@ -319,66 +420,31 @@ if ($exam !== '') {
                 <p class="text-muted">Report of Rating Issuance Logistics and Inventory System</p>
             </div>
 
-            <!-- Summary Card -->
-            <div class="card dashboard-card mb-4">
-                <div class="card-header bg-transparent">
-                    <h5 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Summary of Uploaded Data</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
+            <!-- Updated Filter Card (copied from RTS view) -->
+            <div class="filter-card">
+                <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
+                <form method="get" action="" id="filterForm">
+                    <div class="row align-items-end">
                         <div class="col-md-4">
-                            <div class="stat-card text-center">
-                                <div class="stat-value text-primary"><?= $total_count ?></div>
-                                <div class="stat-label">Total Records (All Examinations)</div>
-                            </div>
-                        </div>
-                        <div class="col-md-8">
-                            <div class="row">
-                                <?php foreach ($exam_counts as $exam_name => $count): ?>
-                                    <div class="col-sm-6 mb-2">
-                                        <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
-                                            <span class="fw-medium"><?= htmlspecialchars($exam_name) ?></span>
-                                            <span class="badge bg-primary"><?= $count ?></span>
-                                        </div>
-                                    </div>
+                            <label for="examSelect" class="form-label"><i class="fas fa-graduation-cap me-1"></i>Select Examination</label>
+                            <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
+                                <option value="">-- Choose an examination --</option>
+                                <?php foreach ($examinations as $examination): ?>
+                                    <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($examination) ?>
+                                    </option>
                                 <?php endforeach; ?>
-                            </div>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="searchName" class="form-label"><i class="fas fa-search me-1"></i>Search Name</label>
+                            <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
+                        </div>
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-2"></i>Search</button>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Filter Card -->
-            <div class="card dashboard-card mb-4">
-                <div class="card-header bg-transparent">
-                    <h5 class="card-title mb-0"><i class="fas fa-filter me-2"></i>Filter Data</h5>
-                </div>
-                <div class="card-body">
-                    <form method="get" action="" id="filterForm">
-                        <div class="row align-items-end">
-                            <div class="col-md-4">
-                                <label for="examSelect" class="form-label">Select Examination:</label>
-                                <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
-                                    <option value="">Choose an examination</option>
-                                    <?php foreach ($examinations as $examination): ?>
-                                        <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($examination) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="searchName" class="form-label">Search Name:</label>
-                                <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
-                            </div>
-                            <div class="col-md-4">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-search me-2"></i>Search
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
+                </form>
             </div>
 
             <!-- Data Table Card -->
@@ -496,81 +562,52 @@ if ($exam !== '') {
                                     <th><i class="fas fa-clock me-1"></i>Date & Time</th>
                                 </tr>
                             </thead>
-                            <?php
-// Replace this section in your viewData.php (around line 45-65)
-
-// Fixed activity logs query - exactly matching staff_dashboard.php
-try {
-    $activity_logs = $pdo->query("
-        SELECT 
-            al.*,
-            COALESCE(al.user_name, al.account_name, 'Unknown User') as full_name
-        FROM activity_log al 
-        ORDER BY al.created_at DESC 
-        LIMIT 50
-    ")->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    try {
-        $activity_logs = $pdo->query("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($activity_logs as &$log) {
-            if (!isset($log['full_name'])) {
-                $log['full_name'] = $log['user_name'] ?? $log['account_name'] ?? 'Unknown User';
-            }
-        }
-    } catch (PDOException $e2) {
-        $activity_logs = [];
-        error_log("Activity log query failed: " . $e2->getMessage());
-    }
-}
-?>
-
-<tbody id="activityTableBody">
-    <?php if (!empty($activity_logs)): ?>
-        <?php foreach ($activity_logs as $log): ?>
-        <tr class="activity-row" data-action="<?php echo $log['action'] ?? ''; ?>">
-            <td>
-                <div class="d-flex align-items-center">
-                    <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
-                    <div>
-                        <div class="fw-medium"><?php echo htmlspecialchars($log['full_name'] ?? 'Unknown User'); ?></div>
-                    </div>
-                </div>
-            </td>
-            <td>
-                <span class="badge bg-<?php 
-                    echo ($log['action'] ?? '') == 'login' ? 'success' : 
-                        (($log['action'] ?? '') == 'logout' ? 'danger' : 
-                        (($log['action'] ?? '') == 'create' ? 'primary' : 
-                        (($log['action'] ?? '') == 'update' ? 'warning' : 
-                        (($log['action'] ?? '') == 'delete' ? 'danger' : 'secondary')))); 
-                ?>">
-                    <i class="fas fa-<?php 
-                        echo ($log['action'] ?? '') == 'login' ? 'sign-in-alt' : 
-                            (($log['action'] ?? '') == 'logout' ? 'sign-out-alt' : 
-                            (($log['action'] ?? '') == 'create' ? 'plus' : 
-                            (($log['action'] ?? '') == 'update' ? 'edit' : 
-                            (($log['action'] ?? '') == 'delete' ? 'trash' : 'info-circle')))); 
-                    ?> me-1"></i><?php echo ucfirst($log['action'] ?? 'Unknown'); ?>
-                </span>
-            </td>
-            <td><?php echo htmlspecialchars($log['description'] ?? 'No description available'); ?></td>
-            <td>
-                <small class="text-muted">
-                    <i class="fas fa-calendar me-1"></i><?php echo isset($log['created_at']) ? date('M j, Y', strtotime($log['created_at'])) : 'Unknown date'; ?><br>
-                    <i class="fas fa-clock me-1"></i><?php echo isset($log['created_at']) ? date('g:i A', strtotime($log['created_at'])) : 'Unknown time'; ?>
-                </small>
-            </td>
-        </tr>
-        <?php endforeach; ?>
-    <?php else: ?>
-        <tr>
-            <td colspan="4" class="text-center text-muted py-4">
-                <i class="fas fa-info-circle me-2"></i>No activity logs available
-            </td>
-        </tr>
-    <?php endif; ?>
-</tbody>
-
+                            <tbody id="activityTableBody">
+                                <?php if (!empty($activity_logs)): ?>
+                                    <?php foreach ($activity_logs as $log): ?>
+                                    <tr class="activity-row" data-action="<?php echo $log['action'] ?? ''; ?>">
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
+                                                <div>
+                                                    <div class="fw-medium"><?php echo htmlspecialchars($log['full_name'] ?? 'Unknown User'); ?></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-<?php 
+                                                echo ($log['action'] ?? '') == 'login' ? 'success' : 
+                                                    (($log['action'] ?? '') == 'logout' ? 'danger' : 
+                                                    (($log['action'] ?? '') == 'create' ? 'primary' : 
+                                                    (($log['action'] ?? '') == 'update' ? 'warning' : 
+                                                    (($log['action'] ?? '') == 'delete' ? 'danger' : 'secondary')))); 
+                                            ?>">
+                                                <i class="fas fa-<?php 
+                                                    echo ($log['action'] ?? '') == 'login' ? 'sign-in-alt' : 
+                                                        (($log['action'] ?? '') == 'logout' ? 'sign-out-alt' : 
+                                                        (($log['action'] ?? '') == 'create' ? 'plus' : 
+                                                        (($log['action'] ?? '') == 'update' ? 'edit' : 
+                                                        (($log['action'] ?? '') == 'delete' ? 'trash' : 'info-circle')))); 
+                                                ?> me-1"></i><?php echo ucfirst($log['action'] ?? 'Unknown'); ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($log['description'] ?? 'No description available'); ?></td>
+                                        <td>
+                                            <small class="text-muted">
+                                                <i class="fas fa-calendar me-1"></i><?php echo isset($log['created_at']) ? date('M j, Y', strtotime($log['created_at'])) : 'Unknown date'; ?><br>
+                                                <i class="fas fa-clock me-1"></i><?php echo isset($log['created_at']) ? date('g:i A', strtotime($log['created_at'])) : 'Unknown time'; ?>
+                                            </small>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">
+                                            <i class="fas fa-info-circle me-2"></i>No activity logs available
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
                         </table>
                     </div>
                 </div>
