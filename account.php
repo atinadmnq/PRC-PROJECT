@@ -23,7 +23,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
 
 // Get current user data
 $user_id = $_SESSION['user_id'];
-$stmt = $pdo->prepare("SELECT full_name, email FROM users WHERE id = ?");
+$stmt = $pdo->prepare("SELECT full_name, email, role FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user_data = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -136,7 +136,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="css/dashboard.css" rel="stylesheet">
+   
+     <?php
+    // Load role-specific CSS
+    if (isset($_SESSION['role'])) {
+        if ($_SESSION['role'] === 'admin') {
+            echo '<link href="css/dashboard.css" rel="stylesheet">';
+        } elseif ($_SESSION['role'] === 'staff') {
+            echo '<link href="css/staff_dashboard.css" rel="stylesheet">';
+        }
+    }
+    ?>
     <style>
         body {
             background: #f8f9fa;
@@ -213,39 +223,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     </style>
 </head>
 <body>
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <a href="#" class="sidebar-brand">
-                <img src="img/rilis-logo.png" alt="RILIS" style="height: 35px; margin-right: 3px;">
-                RILIS
-            </a>
-        </div>
+   
+   <?php
+    // IMPROVED CONDITIONAL PANEL INCLUDE
+    if (isset($_SESSION['role'])) {
+        $userRole = strtolower(trim($_SESSION['role']));
         
-        <div class="user-info">
-            <div class="user-avatar">
-                <i class="fas fa-user"></i>
-            </div>
-            <div class="user-name">
-                <?php echo htmlspecialchars($user_data['full_name']); ?>
-            </div>
-            <small class="text-light"><?php echo htmlspecialchars($user_data['email']); ?></small>
-            <small class="text-light">Administrator</small>
-        </div>
-        
-        <nav class="nav-menu">
-            <ul class="list-unstyled"> 
-                <li class="nav-item"><a href="dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
-                <li class="nav-item"><a href="account.php" class="nav-link active"><i class="fas fa-user-cog"></i>Account Settings</a></li>
-                <li class="nav-item"><a href="register_users.php" class="nav-link"><i class="fas fa-user-plus"></i>Register User</a></li>
-                <li class="nav-item"><a href="activity_log.php" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
-                <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload ROR Data</a></li>
-                <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload RTS Data</a></li>
-                <li class="nav-item"><a href="dashboard.php?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
-            </ul>
-        </nav>
-    </div>
-    
+        if ($userRole === 'admin') {
+            if (file_exists('admin_panel.php')) {
+                include 'admin_panel.php';
+            } else {
+                echo "<!-- Admin panel file not found -->";
+            }
+        } elseif ($userRole === 'staff') {
+            if (file_exists('staff_panel.php')) {
+                include 'staff_panel.php';
+            } else {
+                echo "<!-- Staff panel file not found -->";
+            }
+        } else {
+            echo "<!-- Unknown role: " . htmlspecialchars($_SESSION['role']) . " -->";
+        }
+    } else {
+        echo "<!-- No role set in session -->";
+        // Fallback - you might want to include a default panel or redirect
+    }
+    ?>
+
+
     <!-- Main Content -->
     <div class="main-content">
         <div class="page-header">
@@ -274,14 +279,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
             <?php unset($_SESSION['success']); ?>
         <?php endif; ?>
         
-        <!-- Profile Overview -->
+      <!-- Profile Overview -->
         <div class="profile-card text-center">
             <div class="profile-avatar">
                 <i class="fas fa-user"></i>
             </div>
             <h3 class="mb-1"><?php echo htmlspecialchars($user_data['full_name']); ?></h3>
             <p class="mb-0 opacity-75"><?php echo htmlspecialchars($user_data['email']); ?></p>
-            <small class="opacity-75">Administrator Account</small>
+            <small class="opacity-75">
+                <?php 
+                    // Display role based on user type
+                    if (isset($user_data['role'])) {
+                        switch(strtolower($user_data['role'])) {
+                            case 'admin':
+                                echo 'Administrator Account';
+                                break;
+                            case 'staff':
+                                echo 'Staff Member';
+                                break;
+                            default:
+                                echo ucfirst($user_data['role']) . ' Account';
+                                break;
+                        }
+                    } elseif (isset($user_data['user_type'])) {
+                        // Alternative field name for user type
+                        switch(strtolower($user_data['user_type'])) {
+                            case 'admin':
+                                echo 'Administrator Account';
+                                break;
+                            case 'staff':
+                                echo 'Staff Member';
+                                break;
+                            default:
+                                echo ucfirst($user_data['user_type']) . ' Account';
+                                break;
+                        }
+                    } else {
+                        // Fallback if no role field exists
+                        echo 'User Account';
+                    }
+                ?>
+            </small>
         </div>
         
         <div class="row">

@@ -127,6 +127,12 @@ try {
     error_log("RTS count query failed: " . $e->getMessage());
     $rts_count = 0;
 }
+
+// Debug output (remove this after testing)
+echo "<!-- DEBUG: Recent Activities Count: " . count($recentActivities) . " -->";
+if (!empty($recentActivities)) {
+    echo "<!-- DEBUG: First Activity: " . htmlspecialchars(print_r($recentActivities[0], true)) . " -->";
+}
 ?>
 
 <!DOCTYPE html>
@@ -140,7 +146,16 @@ try {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <!-- Include sidebar styles -->
     <link href="css/Staff_dashboard.css" rel="stylesheet">
+  
+    
     <style>
+        body {
+            background: #f8f9fa;
+            font-family: "Century Gothic";
+            margin: 0;
+            padding: 0;
+        }
+        
         .content-section {
             display: none;
         }
@@ -175,12 +190,21 @@ try {
             font-weight: 700;
             color: #2c3e50;
         }
+        
+        #fonty {
+            font-family: "Century Gothic";
+        }
+        
+        .fonty {
+            font-family: "Century Gothic";
+        }
     </style>
 </head>
 <body>
     <!-- Include sidebar -->
     <?php include 'staff_panel.php'; ?>
     
+    <!-- Main Content -->
     <div class="main-content">
         <?php if (!empty($_SESSION['permission_requested'])): ?>
             <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -201,7 +225,9 @@ try {
         <!-- Dashboard Section -->
         <div id="dashboard" class="content-section active">
             <div class="page-header">
-                <h1 class="page-title"><i class="fas fa-tachometer-alt me-3"></i>Staff Dashboard</h1>
+                <h1 class="page-title">
+                    <i class="fas fa-tachometer-alt me-3" id="fonty"></i>Staff Dashboard
+                </h1>
                 <p class="text-muted">Report of Rating Issuance Logistics and Inventory System</p>
             </div>
 
@@ -288,12 +314,18 @@ try {
                 <div class="col-md-4">
                     <div class="card dashboard-card">
                         <div class="card-header bg-transparent">
-                            <h5 class="card-title mb-0"><i class="fas fa-chart-pie me-2"></i>Quick Actions</h5>
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-chart-pie me-2"></i>Quick Actions
+                            </h5>
                         </div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
-                                <a href="staff_viewData.php" class="btn btn-outline-info"><i class="fas fa-table me-2"></i>View ROR Data</a>
-                                <a href="staff_rts_view.php" class="btn btn-outline-info"><i class="fas fa-table me-2"></i>View RTS Data</a>
+                                <a href="staff_viewData.php" class="btn btn-outline-info">
+                                    <i class="fas fa-table me-2"></i>View ROR Data
+                                </a>
+                                <a href="staff_rts_view.php" class="btn btn-outline-info">
+                                    <i class="fas fa-table me-2"></i>View RTS Data
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -303,5 +335,46 @@ try {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Navigation functionality
+            const navLinks = document.querySelectorAll('.nav-link[data-section]');
+            const contentSections = document.querySelectorAll('.content-section');
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    const targetSection = this.getAttribute('data-section');
+                    
+                    // Remove active class from all nav links and content sections
+                    navLinks.forEach(nav => nav.classList.remove('active'));
+                    contentSections.forEach(section => section.classList.remove('active'));
+                    
+                    // Add active class to clicked nav link and corresponding content section
+                    this.classList.add('active');
+                    document.getElementById(targetSection).classList.add('active');
+                });
+            });
+            
+            // Activity log filtering functionality
+            const activityFilter = document.getElementById('activityFilter');
+            if (activityFilter) {
+                activityFilter.addEventListener('change', function() {
+                    const filter = this.value;
+                    const activityRows = document.querySelectorAll('.activity-row');
+                    
+                    activityRows.forEach(row => {
+                        const rowAction = row.getAttribute('data-action');
+                        
+                        // Show row if filter is 'all' or matches the row's action
+                        if (filter === 'all' || rowAction === filter) {
+                            row.style.display = '';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+                });
+            }
+        });
+    </script>
 </body>
 </html>

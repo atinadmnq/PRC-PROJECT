@@ -21,15 +21,19 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     exit();
 }
 
-// Get user's full name if not set
-if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
-    $stmt = $pdo->prepare("SELECT full_name FROM users WHERE id = ?");
+// Get user's full name and role if not set
+if ((!isset($_SESSION['full_name']) || !isset($_SESSION['role'])) && isset($_SESSION['user_id'])) {
+    $stmt = $pdo->prepare("SELECT full_name, role FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($user) {
         $_SESSION['full_name'] = $user['full_name'];
+        $_SESSION['role'] = $user['role'];
     }
 }
+
+// Debug: Check what role is set (remove this after testing)
+// echo "Current role: " . ($_SESSION['role'] ?? 'NOT SET') . "<br>";
 
 // Handle logout
 if (isset($_GET['logout'])) {
@@ -106,7 +110,17 @@ if (isset($_GET['test'])) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="css/dashboard.css" rel="stylesheet">
-    <link href="css/staff_dashboard.css" rel="stylesheet">
+    
+    <?php
+    // Load role-specific CSS
+    if (isset($_SESSION['role'])) {
+        if ($_SESSION['role'] === 'admin') {
+            echo '<link href="css/admin_dashboard.css" rel="stylesheet">';
+        } elseif ($_SESSION['role'] === 'staff') {
+            echo '<link href="css/staff_dashboard.css" rel="stylesheet">';
+        }
+    }
+    ?>
 
     <style>
         body {
@@ -133,11 +147,41 @@ if (isset($_GET['test'])) {
             margin-bottom: 1rem;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+
+        /* Override staff styles for admin users */
+        <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+        .main-content {
+            /* Add any admin-specific overrides here if needed */
+        }
+        <?php endif; ?>
     </style>
 </head>
 <body>
-     <?php include 'admin_panel.php'; ?>
-     <?php include 'staff_panel.php'; ?>
+    <?php
+    // IMPROVED CONDITIONAL PANEL INCLUDE
+    if (isset($_SESSION['role'])) {
+        $userRole = strtolower(trim($_SESSION['role']));
+        
+        if ($userRole === 'admin') {
+            if (file_exists('admin_panel.php')) {
+                include 'admin_panel.php';
+            } else {
+                echo "<!-- Admin panel file not found -->";
+            }
+        } elseif ($userRole === 'staff') {
+            if (file_exists('staff_panel.php')) {
+                include 'staff_panel.php';
+            } else {
+                echo "<!-- Staff panel file not found -->";
+            }
+        } else {
+            echo "<!-- Unknown role: " . htmlspecialchars($_SESSION['role']) . " -->";
+        }
+    } else {
+        echo "<!-- No role set in session -->";
+        // Fallback - you might want to include a default panel or redirect
+    }
+    ?>
 
     <!-- Main Content -->
     <div class="main-content">
