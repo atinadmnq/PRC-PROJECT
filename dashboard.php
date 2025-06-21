@@ -68,43 +68,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_user'])) {
 }
 
 // Function to get recent activities - FIXED VERSION
-function getRecentActivities($pdo, $limit = 5) {
+function getRecentActivities($pdo, $limit = 3) {
     try {
-        // First, let's check what columns actually exist
         $stmt = $pdo->prepare("
             SELECT 
-                id,
                 account_name,
                 activity_type,
                 description,
-                created_at,
-                ip_address
+                created_at
             FROM activity_log 
             ORDER BY created_at DESC 
             LIMIT ?
         ");
-        $stmt->execute([$limit]);
+        $stmt->bindValue(1, (int)$limit, PDO::PARAM_INT);
+        $stmt->execute();
         $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Add full_name and action fields for compatibility
-        foreach ($activities as &$activity) {
-            $activity['full_name'] = $activity['account_name'] ?? 'Unknown User';
-            $activity['action'] = $activity['activity_type'] ?? 'unknown';
+
+        $summary = [];
+        foreach ($activities as $activity) {
+            $summary[] = [
+                'summary' => $activity['account_name'] . " - " . $activity['description'] . " on " . date('M j, Y g:i A', strtotime($activity['created_at'])),
+                'action' => $activity['activity_type'] ?? 'unknown',
+                'created_at' => $activity['created_at']
+            ];
         }
-        
-        return $activities;
+
+        return $summary;
     } catch (PDOException $e) {
         error_log("Recent activities query failed: " . $e->getMessage());
-        return []; // Return empty array instead of null
+        return [];
     }
 }
+
+
 
 // Initialize recentActivities with empty array as fallback
 $recentActivities = [];
 
 // Get recent activities for dashboard display
 try {
-    $recentActivities = getRecentActivities($pdo, 5);
+    $recentActivities = getRecentActivities($pdo, 3);
 } catch (Exception $e) {
     error_log("Error getting recent activities: " . $e->getMessage());
     $recentActivities = []; // Ensure it's always an array
@@ -361,10 +364,9 @@ if (!empty($recentActivities)) {
                                                 ?>"></i>
                                             </div>
                                             <div class="activity-content">
-                                                <div class="activity-text">
-                                                    <strong><?php echo htmlspecialchars($activity['full_name']); ?></strong>
-                                                    <?php echo htmlspecialchars($activity['description'] ?? 'No description available'); ?>
-                                                </div>
+                                           <div class="activity-text">
+    <?php echo htmlspecialchars($activity['summary']); ?>
+</div>
                                                 <div class="activity-time">
                                                     <?php echo isset($activity['created_at']) ? date('M j, Y g:i A', strtotime($activity['created_at'])) : 'Unknown time'; ?>
                                                 </div>
