@@ -126,6 +126,7 @@ try {
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="css/staff_dashboard.css" rel="stylesheet">
     <style>
         body {
             background: #f8f9fa;
@@ -400,29 +401,7 @@ try {
     </style>
 </head>
 <body>
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <a href="#" class="sidebar-brand">
-                <img src="img/rilis-logo.png" alt="RILIS" style="height: 35px; margin-right: 3px;">
-                RILIS
-            </a>
-        </div>
-        <div class="user-info">
-            <div class="user-avatar"><i class="fas fa-user"></i></div>
-            <div class="user-name"><?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['email'] ?? 'User'); ?></div>
-            <small class="text-light"><?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?></small>
-            <small class="text-light">Staff Member</small>
-        </div>
-        <nav class="nav-menu">
-            <ul class="list-unstyled">
-                <li class="nav-item"><a href="staff_dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
-                <li class="nav-item"><button class="nav-link" data-section="activity"><i class="fas fa-history"></i>Activity Log</button></li>
-                <li class="nav-item"><button class="nav-link active" data-section="rts-table"><i class="fas fa-table"></i>RTS Table View</button></li>
-                <li class="nav-item"><a href="staff_viewData.php" class="nav-link"><i class="fas fa-table"></i>ROR Table View</a></li>
-                <li class="nav-item"><a href="staff_dashboard.php?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
-            </ul>
-        </nav>
-    </div>
+    <?php include 'staff_panel.php'; ?>
     
     <!-- Right Side Panel for Summary -->
     <div class="right-panel">
