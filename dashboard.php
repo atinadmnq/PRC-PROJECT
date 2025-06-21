@@ -67,64 +67,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_user'])) {
     }
 }
 
-// Function to get recent activities
+// Function to get recent activities - FIXED VERSION
 function getRecentActivities($pdo, $limit = 5) {
     try {
+        // First, let's check what columns actually exist
         $stmt = $pdo->prepare("
             SELECT 
-                al.*,
-                COALESCE(al.user_name, al.account_name, 'Unknown User') as full_name
-            FROM activity_log al
-            ORDER BY al.created_at DESC
+                id,
+                account_name,
+                activity_type,
+                description,
+                created_at,
+                ip_address
+            FROM activity_log 
+            ORDER BY created_at DESC 
             LIMIT ?
         ");
         $stmt->execute([$limit]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        // Fallback query if the above fails
-        try {
-            $stmt = $pdo->prepare("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?");
-            $stmt->execute([$limit]);
-            $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Add full_name if not present
-            foreach ($activities as &$activity) {
-                if (!isset($activity['full_name'])) {
-                    $activity['full_name'] = $activity['user_name'] ?? $activity['account_name'] ?? 'Unknown User';
-                }
-            }
-            return $activities;
-        } catch (PDOException $e2) {
-            error_log("Recent activities query failed: " . $e2->getMessage());
-            return [];
+        $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Add full_name and action fields for compatibility
+        foreach ($activities as &$activity) {
+            $activity['full_name'] = $activity['account_name'] ?? 'Unknown User';
+            $activity['action'] = $activity['activity_type'] ?? 'unknown';
         }
+        
+        return $activities;
+    } catch (PDOException $e) {
+        error_log("Recent activities query failed: " . $e->getMessage());
+        return []; // Return empty array instead of null
     }
+}
+
+// Initialize recentActivities with empty array as fallback
+$recentActivities = [];
+
+// Get recent activities for dashboard display
+try {
+    $recentActivities = getRecentActivities($pdo, 5);
+} catch (Exception $e) {
+    error_log("Error getting recent activities: " . $e->getMessage());
+    $recentActivities = []; // Ensure it's always an array
 }
 
 // Fetch activity logs for main display
+$activity_logs = [];
 try {
-    $activity_logs = $pdo->query("
+    $stmt = $pdo->prepare("
         SELECT
-            al.*,
-            COALESCE(al.user_name, al.account_name, 'Unknown User') as full_name
-        FROM activity_log al
-        ORDER BY al.created_at DESC
+            id,
+            account_name,
+            activity_type,
+            description,
+            created_at,
+            ip_address
+        FROM activity_log 
+        ORDER BY created_at DESC 
         LIMIT 50
-    ")->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    try {
-        $activity_logs = $pdo->query("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($activity_logs as &$log) {
-            if (!isset($log['full_name'])) {
-                $log['full_name'] = $log['user_name'] ?? $log['account_name'] ?? 'Unknown User';
-            }
-        }
-    } catch (PDOException $e2) {
-        $activity_logs = [];
-        error_log("Activity log query failed: " . $e2->getMessage());
+    ");
+    $stmt->execute();
+    $activity_logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Add compatibility fields
+    foreach ($activity_logs as &$log) {
+        $log['full_name'] = $log['account_name'] ?? 'Unknown User';
+        $log['action'] = $log['activity_type'] ?? 'unknown';
     }
+} catch (PDOException $e) {
+    error_log("Activity log query failed: " . $e->getMessage());
+    $activity_logs = [];
 }
 
+// Get ROR count
 $ror_count = 0;
 try {
     $sql_ror_count = "SELECT COUNT(*) as total_ror FROM roravailable";
@@ -138,10 +152,9 @@ try {
     $ror_count = 0;
 }
 
-// Optional: Get RTS count if you have an RTS table
+// Get RTS count
 $rts_count = 0;
 try {
-    // Assuming you have an RTS table - replace 'rts_table_name' with your actual RTS table name
     $sql_rts_count = "SELECT COUNT(*) as total_rts FROM rts_data_onhold";
     $result_rts = $pdo->query($sql_rts_count);
     if ($result_rts) {
@@ -149,13 +162,15 @@ try {
         $rts_count = $row_rts['total_rts'];
     }
 } catch (PDOException $e) {
-    // Table might not exist or query failed
     error_log("RTS count query failed: " . $e->getMessage());
     $rts_count = 0;
 }
 
-// Get recent activities for dashboard display
-$recentActivities = getRecentActivities($pdo, 5);
+// Debug output (remove this after testing)
+echo "<!-- DEBUG: Recent Activities Count: " . count($recentActivities) . " -->";
+if (!empty($recentActivities)) {
+    echo "<!-- DEBUG: First Activity: " . htmlspecialchars(print_r($recentActivities[0], true)) . " -->";
+}
 ?>
 
 <!DOCTYPE html>

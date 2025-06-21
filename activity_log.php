@@ -40,50 +40,46 @@ if (isset($_GET['logout'])) {
     exit();
 }
 
-// Function to log activities
+// Function to log activities (updated to remove IP address)
 function logActivity($pdo, $userId, $userName, $action, $description, $additionalData = []) {
     try {
-        $stmt = $pdo->prepare("INSERT INTO activity_log (user_id, account_name, user_name, activity_type, action, description, ip_address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+        $stmt = $pdo->prepare("INSERT INTO activity_log (account_name, activity_type, description, created_at) VALUES (?, ?, ?, NOW())");
         $stmt->execute([
-            $userId,
-            $userName,
             $userName,
             $action,
-            $action,
-            $description,
-            $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'
+            $description
         ]);
     } catch (PDOException $e) {
         error_log("Failed to log activity: " . $e->getMessage());
     }
 }
 
-// Fetch activity logs with enhanced query
+// Fetch activity logs with enhanced query (removed IP address)
 try {
     $activity_logs = $pdo->query("
         SELECT
             al.*,
-            COALESCE(al.user_name, al.account_name, 'Unknown User') as full_name,
+            COALESCE(al.account_name, 'Unknown User') as full_name,
             CASE 
-                WHEN al.action = 'login' THEN 'success'
-                WHEN al.action = 'logout' THEN 'danger'
-                WHEN al.action = 'upload_ror' THEN 'info'
-                WHEN al.action = 'upload_rts' THEN 'warning'
-                WHEN al.action = 'release' THEN 'primary'
-                WHEN al.action = 'create' THEN 'primary'
-                WHEN al.action = 'update' THEN 'warning'
-                WHEN al.action = 'delete' THEN 'danger'
+                WHEN al.activity_type = 'login' THEN 'success'
+                WHEN al.activity_type = 'logout' THEN 'danger'
+                WHEN al.activity_type = 'upload_ror' THEN 'info'
+                WHEN al.activity_type = 'upload_rts' THEN 'warning'
+                WHEN al.activity_type = 'release' THEN 'primary'
+                WHEN al.activity_type = 'create' THEN 'primary'
+                WHEN al.activity_type = 'update' THEN 'warning'
+                WHEN al.activity_type = 'delete' THEN 'danger'
                 ELSE 'secondary'
             END as badge_class,
             CASE 
-                WHEN al.action = 'login' THEN 'sign-in-alt'
-                WHEN al.action = 'logout' THEN 'sign-out-alt'
-                WHEN al.action = 'upload_ror' THEN 'file-upload'
-                WHEN al.action = 'upload_rts' THEN 'file-upload'
-                WHEN al.action = 'release' THEN 'paper-plane'
-                WHEN al.action = 'create' THEN 'plus'
-                WHEN al.action = 'update' THEN 'edit'
-                WHEN al.action = 'delete' THEN 'trash'
+                WHEN al.activity_type = 'login' THEN 'sign-in-alt'
+                WHEN al.activity_type = 'logout' THEN 'sign-out-alt'
+                WHEN al.activity_type = 'upload_ror' THEN 'file-upload'
+                WHEN al.activity_type = 'upload_rts' THEN 'file-upload'
+                WHEN al.activity_type = 'release' THEN 'paper-plane'
+                WHEN al.activity_type = 'create' THEN 'plus'
+                WHEN al.activity_type = 'update' THEN 'edit'
+                WHEN al.activity_type = 'delete' THEN 'trash'
                 ELSE 'info-circle'
             END as icon_class
         FROM activity_log al
@@ -93,6 +89,10 @@ try {
 } catch (PDOException $e) {
     $activity_logs = [];
     error_log("Activity log query failed: " . $e->getMessage());
+}
+
+if (isset($_GET['test'])) {
+    testActivityLogging($pdo);
 }
 ?>
 
@@ -115,7 +115,7 @@ try {
         }
         
         .activity-description {
-            max-width: 300px;
+            max-width: 400px;
             word-wrap: break-word;
         }
         
@@ -183,12 +183,12 @@ try {
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="dashboard.php#register" class="nav-link">
+                    <a href="register_users.php" class="nav-link">
                         <i class="fas fa-user-plus"></i>Register User
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="activity_log.php" class="nav-link active">
+                    <a href="activity_log.php" class="nav-link">
                         <i class="fas fa-history"></i>Activity Log
                     </a>
                 </li>
@@ -286,14 +286,13 @@ try {
                                 <th><i class="fas fa-cog me-1"></i>Action</th>
                                 <th><i class="fas fa-info-circle me-1"></i>Description</th>
                                 <th><i class="fas fa-clock me-1"></i>Date & Time</th>
-                                <th><i class="fas fa-map-marker-alt me-1"></i>IP Address</th>
                             </tr>
                         </thead>
                         <tbody id="activityTableBody">
                             <?php if (!empty($activity_logs)): ?>
                                 <?php foreach ($activity_logs as $log): ?>
                                     <tr class="activity-row" 
-                                        data-action="<?php echo htmlspecialchars($log['action'] ?? ''); ?>"
+                                        data-action="<?php echo htmlspecialchars($log['activity_type'] ?? ''); ?>"
                                         data-date="<?php echo isset($log['created_at']) ? date('Y-m-d', strtotime($log['created_at'])) : ''; ?>"
                                         data-user="<?php echo htmlspecialchars(strtolower($log['full_name'] ?? '')); ?>"
                                         data-description="<?php echo htmlspecialchars(strtolower($log['description'] ?? '')); ?>">
@@ -314,7 +313,7 @@ try {
                                                 <i class="fas fa-<?php echo $log['icon_class'] ?? 'info-circle'; ?> me-1"></i>
                                                 <?php 
                                                 $actionDisplay = '';
-                                                switch($log['action'] ?? '') {
+                                                switch($log['activity_type'] ?? '') {
                                                     case 'login':
                                                         $actionDisplay = 'Login';
                                                         break;
@@ -340,7 +339,7 @@ try {
                                                         $actionDisplay = 'Delete';
                                                         break;
                                                     default:
-                                                        $actionDisplay = ucfirst($log['action'] ?? 'Unknown');
+                                                        $actionDisplay = ucfirst($log['activity_type'] ?? 'Unknown');
                                                 }
                                                 echo $actionDisplay;
                                                 ?>
@@ -362,16 +361,11 @@ try {
                                                 </small>
                                             </div>
                                         </td>
-                                        <td>
-                                            <small class="text-muted font-monospace">
-                                                <?php echo htmlspecialchars($log['ip_address'] ?? 'N/A'); ?>
-                                            </small>
-                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="5" class="text-center text-muted py-4">
+                                    <td colspan="4" class="text-center text-muted py-4">
                                         <i class="fas fa-info-circle me-2"></i>No activity logs available
                                     </td>
                                 </tr>
@@ -458,8 +452,8 @@ try {
         }
         
         function exportActivityLog() {
-            // Create CSV content
-            let csvContent = "User,Action,Description,Date & Time,IP Address\n";
+            // Create CSV content (updated to remove IP address)
+            let csvContent = "User,Action,Description,Date & Time\n";
             
             const visibleRows = document.querySelectorAll('.activity-row[style=""], .activity-row:not([style])');
             visibleRows.forEach(row => {
@@ -468,9 +462,8 @@ try {
                 const action = cells[1].textContent.trim().replace(/\s+/g, ' ');
                 const description = cells[2].textContent.trim().replace(/\s+/g, ' ');
                 const dateTime = cells[3].textContent.trim().replace(/\s+/g, ' ');
-                const ipAddress = cells[4].textContent.trim();
                 
-                csvContent += `"${user}","${action}","${description}","${dateTime}","${ipAddress}"\n`;
+                csvContent += `"${user}","${action}","${description}","${dateTime}"\n`;
             });
             
             // Download CSV
