@@ -1,9 +1,22 @@
 <?php
-
-if (session_status() == PHP_SESSION_NONE) {
+// Make sure session is started before including this file
+if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Check if user is logged in
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header("Location: index.php");
+    exit();
+}
+
+
+// Handle logout
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header("Location: index.php");
+    exit();
+}
 
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
@@ -28,6 +41,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <i class="fas fa-tachometer-alt"></i>Dashboard
                 </a>
             </li>
+            <li class="nav-item"><a href="account.php" class="nav-link"><i class="fas fa-user-cog"></i>Account Settings</a></li>
+
             <li class="nav-item">
                 <a href="activity_log.php" class="nav-link <?php echo $current_page == 'activity_log.php' ? 'active' : ''; ?>">
                     <i class="fas fa-history"></i>Activity Log
@@ -44,7 +59,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </a>
             </li>
             <li class="nav-item">
-                <a href="?logout=1" class="nav-link">
+                <a href="index.php" class="nav-link">
                     <i class="fas fa-sign-out-alt"></i>Logout
                 </a>
             </li>
