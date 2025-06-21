@@ -38,6 +38,11 @@ function logActivity($pdo, $userId, $accountName, $activityType, $description, $
     }
 }
 
+function logUserCreation($pdo, $userId, $accountName, $newFullName, $newEmail, $newRole) {
+    $description = "Registered new user: $newFullName ($newEmail) as $newRole";
+    return logActivity($pdo, $userId, $accountName, 'Create User', $description);
+}
+
 /**
  * Logs individual release activity
  */
