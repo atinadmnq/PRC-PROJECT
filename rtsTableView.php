@@ -1,4 +1,3 @@
-<!-- rtsTableView.php -->
 <?php
 session_start();
 require_once 'activity_logger.php';
@@ -10,96 +9,131 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 
 try {
-    $pdo = new PDO("mysql:host=".DB_HOST.";dbname=".DB_NAME, DB_USER, DB_PASS);
+    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch (PDOException $e) {
     die("Database connection failed: " . $e->getMessage());
 }
 
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) { 
-    header("Location: index.php"); 
-    exit(); 
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header("Location: index.php");
+    exit();
 }
 
-// Get user's full name
+// Get account name
+$accountName = $_SESSION['account_name'] ?? $_SESSION['email'] ?? $_SESSION['full_name'] ?? 'Unknown User';
+
+// Get user's full name if not already set
 if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
     $stmt = $pdo->prepare("SELECT full_name FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($user) $_SESSION['full_name'] = $user['full_name'];
+    if ($user) {
+        $_SESSION['full_name'] = $user['full_name'];
+    }
 }
 
-include 'db_connect.php';
-
-// Handle "Release" (Delete) action
+// Handle individual release
 if (isset($_POST['release_id'])) {
     $release_id = intval($_POST['release_id']);
-    
-    $stmt = $conn->prepare("DELETE FROM rts_data_onhold WHERE id = ?");
-    $stmt->bind_param("i", $release_id);
-    
-    if ($stmt->execute()) {
-        // Optional: add a message or redirect after successful delete
-        header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
-        exit;
-    } else {
-        echo "Error releasing record: " . $conn->error;
+
+    try {
+        $stmt = $pdo->prepare("SELECT name, examination, exam_date, status, upload_timestamp FROM rts_data_onhold WHERE id = ?");
+        $stmt->execute([$release_id]);
+        $record = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($record) {
+            $stmt = $pdo->prepare("DELETE FROM rts_data_onhold WHERE id = ?");
+            if ($stmt->execute([$release_id])) {
+                $description = "Released RTS record: Name = {$record['name']}, Exam = {$record['examination']}, Date = {$record['exam_date']}, Status = {$record['status']}, Uploaded = {$record['upload_timestamp']}";
+                logActivity(
+                    $pdo,
+                    $_SESSION['user_id'] ?? null,
+                    $_SESSION['full_name'] ?? $accountName,
+                    'Release RTS',
+                    $description,
+                    $record['name'],
+                    '',
+                    $release_id
+                );
+
+                $_SESSION['release_message'] = "Results successfully released for {$record['name']}";
+                $_SESSION['release_status'] = 'success';
+            } else {
+                logActivity(
+                    $pdo,
+                    $_SESSION['user_id'] ?? null,
+                    $_SESSION['full_name'] ?? $accountName,
+                    'release_failed',
+                    "Failed to release RTS record for {$record['name']} - Release ID: {$release_id} - Database Error"
+                );
+
+                $_SESSION['release_message'] = "Error releasing record for {$record['name']}";
+                $_SESSION['release_status'] = 'error';
+            }
+        }
+    } catch (Exception $e) {
+        logActivity(
+            $pdo,
+            $_SESSION['user_id'] ?? null,
+            $_SESSION['full_name'] ?? $accountName,
+            'release_exception',
+            "Exception during RTS release for Release ID: {$release_id} - Error: " . $e->getMessage()
+        );
+
+        $_SESSION['release_message'] = "Release failed due to an error: " . $e->getMessage();
+        $_SESSION['release_status'] = 'error';
     }
-    $stmt->close();
+
+    header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
+    exit();
 }
 
-// Get all distinct examinations
+// Fetch examination list
 $sql = "SELECT DISTINCT examination FROM rts_data_onhold ORDER BY upload_timestamp DESC";
-$result = $conn->query($sql);
+$result = $pdo->query($sql);
+$examinations = $result ? $result->fetchAll(PDO::FETCH_COLUMN) : [];
 
-$examinations = [];
-if ($result) {
-    while ($row = $result->fetch_assoc()) {
-        $examinations[] = $row['examination'];
-    }
-}
-
-// Get count per examination
+// Fetch examination counts
 $sql_counts = "SELECT examination, COUNT(*) as count FROM rts_data_onhold GROUP BY examination";
-$result_counts = $conn->query($sql_counts);
-
+$result_counts = $pdo->query($sql_counts);
 $exam_counts = [];
 $total_count = 0;
-
 if ($result_counts) {
-    while ($row = $result_counts->fetch_assoc()) {
+    foreach ($result_counts->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $exam_counts[$row['examination']] = $row['count'];
         $total_count += $row['count'];
     }
 }
 
-// Read GET parameters safely
-$exam = isset($_GET['examination']) ? trim($conn->real_escape_string($_GET['examination'])) : '';
-$search_name = isset($_GET['search_name']) ? trim($conn->real_escape_string($_GET['search_name'])) : '';
-
-// If examination selected, fetch its data with optional name filter
+// Fetch data based on filters
+$exam = isset($_GET['examination']) ? trim($_GET['examination']) : '';
+$search_name = isset($_GET['search_name']) ? trim($_GET['search_name']) : '';
 $data = [];
+
 if ($exam !== '') {
     $sql_data = "SELECT id, name, examination, exam_date, upload_timestamp, status 
                  FROM rts_data_onhold 
-                 WHERE LOWER(examination) = LOWER('$exam')";
+                 WHERE LOWER(examination) = LOWER(?)";
+    $params = [$exam];
 
     if ($search_name !== '') {
-        $sql_data .= " AND name LIKE '%$search_name%'";
+        $sql_data .= " AND name LIKE ?";
+        $params[] = "%$search_name%";
     }
 
     $sql_data .= " ORDER BY upload_timestamp DESC";
 
-    $result_data = $conn->query($sql_data);
-
-    if ($result_data) {
-        while ($row = $result_data->fetch_assoc()) {
-            $data[] = $row;
-        }
-    }
+    $stmt = $pdo->prepare($sql_data);
+    $stmt->execute($params);
+    $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
 
+
+
+
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>

@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once 'activity_logger.php'; 
+require_once 'activity_logger.php';
 
 // Database connection
 define('DB_HOST', 'localhost');
@@ -21,6 +21,8 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     exit();
 }
 
+$accountName = $_SESSION['account_name'] ?? $_SESSION['email'] ?? $_SESSION['full_name'] ?? 'Unknown User';
+
 // Get user's full name if not already set
 if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
     $stmt = $pdo->prepare("SELECT full_name FROM users WHERE id = ?");
@@ -29,35 +31,6 @@ if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
     if ($user) $_SESSION['full_name'] = $user['full_name'];
 }
 
-// Enhanced logging functions
-function logActivity($pdo, $user_id, $username, $action, $details = '') {
-    try {
-        $stmt = $pdo->prepare("INSERT INTO activity_log (user_id, username, action, details, timestamp, created_at) VALUES (?, ?, ?, ?, NOW(), NOW())");
-        $stmt->execute([$user_id, $username, $action, $details]);
-    } catch (PDOException $e) {
-        error_log("Activity logging failed: " . $e->getMessage());
-    }
-}
-
-function logReleaseActivity($pdo, $user_id, $username, $examinee_name, $release_type = 'individual', $details = '') {
-    $action = 'release_' . $release_type;
-    $full_details = "Released results for: {$examinee_name}";
-    if (!empty($details)) {
-        $full_details .= " - {$details}";
-    }
-    
-    logActivity($pdo, $user_id, $username, $action, $full_details);
-}
-
-// Log the RTS table view access
-logActivity(
-    $pdo,
-    $_SESSION['user_id'] ?? null,
-    $_SESSION['account_name'] ?? $_SESSION['email'] ?? $_SESSION['full_name'] ?? 'Unknown User',
-    'rts_table_view_access',
-    'Staff accessed RTS table view'
-);
-
 // Enhanced "Release" (Delete) action with proper logging
 if (isset($_POST['release_id'])) {
     $release_id = intval($_POST['release_id']);
@@ -65,56 +38,60 @@ if (isset($_POST['release_id'])) {
     $examination = $_POST['examination'] ?? 'Unknown Examination';
     
     try {
-        // First, get the examinee details before deletion for logging
-        $stmt = $pdo->prepare("SELECT name, examination FROM roravailable WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT name, examination, exam_date, status, upload_timestamp FROM roravailable WHERE id = ?");
         $stmt->execute([$release_id]);
         $examinee_data = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($examinee_data) {
             $examinee_name = $examinee_data['name'];
             $examination = $examinee_data['examination'];
-        }
-        
-        // Perform the deletion
-        $stmt = $pdo->prepare("DELETE FROM roravailable WHERE id = ?");
-        
-        if ($stmt->execute([$release_id])) {
-            // Log successful release
-            logReleaseActivity(
-                $pdo,
-                $_SESSION['user_id'] ?? null,
-                $_SESSION['full_name'] ?? $_SESSION['account_name'] ?? $_SESSION['email'] ?? 'Unknown User',
-                $examinee_name,
-                'individual',
-                "Release ID: {$release_id}, Examination: {$examination}"
-            );
             
-            // Set success message
-            $_SESSION['release_message'] = "Results successfully released for {$examinee_name}";
-            $_SESSION['release_status'] = 'success';
+            $stmt = $pdo->prepare("DELETE FROM roravailable WHERE id = ?");
             
-            // Redirect to prevent form resubmission
-            header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
-            exit;
+            if ($stmt->execute([$release_id])) {
+                logReleaseActivity(
+                    $pdo,
+                    $_SESSION['user_id'] ?? null,
+                    $_SESSION['full_name'] ?? $accountName,
+                    $examinee_name,
+                    'individual',
+                    "Released ROR record: Name = {$examinee_data['name']}, Exam = {$examinee_data['examination']}, Date = {$examinee_data['exam_date']}, Status = {$examinee_data['status']}, Uploaded = {$examinee_data['upload_timestamp']}"
+                );
+                
+                $_SESSION['release_message'] = "Results successfully released for {$examinee_name}";
+                $_SESSION['release_status'] = 'success';
+                
+                header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
+                exit;
+            } else {
+                logActivity(
+                    $pdo,
+                    $_SESSION['user_id'] ?? null,
+                    $_SESSION['full_name'] ?? $accountName,
+                    'release_failed',
+                    "Failed to release results for {$examinee_name} - Release ID: {$release_id} - Database Error"
+                );
+                
+                $_SESSION['release_message'] = "Error releasing record for {$examinee_name}";
+                $_SESSION['release_status'] = 'error';
+            }
         } else {
-            // Log failed release attempt
             logActivity(
                 $pdo,
                 $_SESSION['user_id'] ?? null,
-                $_SESSION['full_name'] ?? $_SESSION['account_name'] ?? $_SESSION['email'] ?? 'Unknown User',
+                $_SESSION['full_name'] ?? $accountName,
                 'release_failed',
-                "Failed to release results for {$examinee_name} - Release ID: {$release_id} - Database Error"
+                "Release ID: {$release_id} not found"
             );
-            
-            $_SESSION['release_message'] = "Error releasing record for {$examinee_name}";
+
+            $_SESSION['release_message'] = "Record not found for release.";
             $_SESSION['release_status'] = 'error';
         }
     } catch (Exception $e) {
-        // Log exception during release
         logActivity(
             $pdo,
             $_SESSION['user_id'] ?? null,
-            $_SESSION['full_name'] ?? $_SESSION['account_name'] ?? $_SESSION['email'] ?? 'Unknown User',
+            $_SESSION['full_name'] ?? $accountName,
             'release_exception',
             "Exception during release for {$examinee_name} - Release ID: {$release_id} - Error: " . $e->getMessage()
         );
@@ -131,7 +108,6 @@ if (isset($_POST['bulk_release'])) {
     if (!empty($selected_ids)) {
         $success_count = 0;
         $failed_count = 0;
-        $released_names = [];
         
         try {
             $pdo->beginTransaction();
@@ -139,42 +115,39 @@ if (isset($_POST['bulk_release'])) {
             foreach ($selected_ids as $id) {
                 $id = intval($id);
                 
-                // Get examinee data before deletion
-                $stmt = $pdo->prepare("SELECT name, examination FROM roravailable WHERE id = ?");
+                $stmt = $pdo->prepare("SELECT name, examination, exam_date, status, upload_timestamp FROM roravailable WHERE id = ?");
                 $stmt->execute([$id]);
                 $examinee_data = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if ($examinee_data) {
-                    // Perform deletion
                     $delete_stmt = $pdo->prepare("DELETE FROM roravailable WHERE id = ?");
                     if ($delete_stmt->execute([$id])) {
                         $success_count++;
-                        $released_names[] = $examinee_data['name'];
                         
-                        // Log individual release within bulk
                         logReleaseActivity(
                             $pdo,
                             $_SESSION['user_id'] ?? null,
-                            $_SESSION['full_name'] ?? $_SESSION['account_name'] ?? $_SESSION['email'] ?? 'Unknown User',
+                            $_SESSION['full_name'] ?? $accountName,
                             $examinee_data['name'],
                             'bulk',
-                            "Bulk Release ID: {$id}, Examination: {$examinee_data['examination']}"
+                            "Released ROR record: Name = {$examinee_data['name']}, Exam = {$examinee_data['examination']}, Date = {$examinee_data['exam_date']}, Status = {$examinee_data['status']}, Uploaded = {$examinee_data['upload_timestamp']}"
                         );
                     } else {
                         $failed_count++;
                     }
+                } else {
+                    $failed_count++;
                 }
             }
             
             $pdo->commit();
             
-            // Log bulk release summary
             logActivity(
                 $pdo,
                 $_SESSION['user_id'] ?? null,
-                $_SESSION['full_name'] ?? $_SESSION['account_name'] ?? $_SESSION['email'] ?? 'Unknown User',
+                $_SESSION['full_name'] ?? $accountName,
                 'bulk_release_summary',
-                "Bulk release completed - Success: {$success_count}, Failed: {$failed_count}, Names: " . implode(', ', array_slice($released_names, 0, 10)) . ($success_count > 10 ? '...' : '')
+                "Bulk release completed - Success: {$success_count}, Failed: {$failed_count}"
             );
             
             $_SESSION['release_message'] = "Bulk release completed: {$success_count} successful, {$failed_count} failed";
@@ -186,7 +159,7 @@ if (isset($_POST['bulk_release'])) {
             logActivity(
                 $pdo,
                 $_SESSION['user_id'] ?? null,
-                $_SESSION['full_name'] ?? $_SESSION['account_name'] ?? $_SESSION['email'] ?? 'Unknown User',
+                $_SESSION['full_name'] ?? $accountName,
                 'bulk_release_failed',
                 "Bulk release failed - Error: " . $e->getMessage()
             );
@@ -196,60 +169,47 @@ if (isset($_POST['bulk_release'])) {
         }
         
         header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
-        exit;
+        exit();
     }
 }
 
-// Get all distinct examinations
+// Fetch examination list
 $sql = "SELECT DISTINCT examination FROM roravailable ORDER BY upload_timestamp DESC";
 $result = $pdo->query($sql);
+$examinations = $result ? $result->fetchAll(PDO::FETCH_COLUMN) : [];
 
-$examinations = [];
-if ($result) {
-    while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
-        $examinations[] = $row['examination'];
-    }
-}
-
-// Get count per examination
+// Fetch examination counts
 $sql_counts = "SELECT examination, COUNT(*) as count FROM roravailable GROUP BY examination";
 $result_counts = $pdo->query($sql_counts);
-
 $exam_counts = [];
 $total_count = 0;
-
 if ($result_counts) {
-    while ($row = $result_counts->fetch(PDO::FETCH_ASSOC)) {
+    foreach ($result_counts->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $exam_counts[$row['examination']] = $row['count'];
         $total_count += $row['count'];
     }
 }
 
-// Read GET parameters safely
+// Fetch data based on filter
 $exam = isset($_GET['examination']) ? trim($_GET['examination']) : '';
 $search_name = isset($_GET['search_name']) ? trim($_GET['search_name']) : '';
-
-// If examination selected, fetch its data with optional name filter
 $data = [];
 if ($exam !== '') {
     $sql_data = "SELECT id, name, examination, exam_date, upload_timestamp, status 
                  FROM roravailable 
                  WHERE LOWER(examination) = LOWER(?)";
     $params = [$exam];
-
     if ($search_name !== '') {
         $sql_data .= " AND name LIKE ?";
-        $params[] = '%' . $search_name . '%';
+        $params[] = "%$search_name%";
     }
-
     $sql_data .= " ORDER BY upload_timestamp DESC";
-
     $stmt = $pdo->prepare($sql_data);
     $stmt->execute($params);
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Activity logs for the Activity Log section
+// Fetch activity logs
 try {
     $activity_logs = $pdo->query("
         SELECT 
@@ -260,19 +220,13 @@ try {
         LIMIT 50
     ")->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    try {
-        $activity_logs = $pdo->query("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($activity_logs as &$log) {
-            if (!isset($log['full_name'])) {
-                $log['full_name'] = $log['user_name'] ?? $log['account_name'] ?? $log['username'] ?? 'Unknown User';
-            }
-        }
-    } catch (PDOException $e2) {
-        $activity_logs = [];
-        error_log("Activity log query failed: " . $e2->getMessage());
-    }
+    $activity_logs = [];
+    error_log("Activity log query failed: " . $e->getMessage());
 }
 ?>
+
+
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -283,285 +237,7 @@ try {
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body {
-            background: #f8f9fa;
-            font-family: "Century Gothic";
-            margin: 0;
-            padding: 0;
-        }
-        
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            width: 280px;
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
-            color: white;
-            z-index: 1000;
-            transition: all 0.3s ease;
-        }
-        
-        .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .sidebar-brand {
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-decoration: none;
-            color: white;
-        }
-        
-        .sidebar-brand:hover {
-            color: white;
-        }
-        
-        .user-info {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-        
-        .user-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 10px;
-            font-size: 1.5rem;
-        }
-        
-       .user-name {
-            font-weight: normal;
-            margin-bottom: 5px;
-        }
-        
-        .nav-menu {
-            padding: 20px 0;
-        }
-        
-        .nav-item {
-            margin-bottom: 5px;
-        }
-        
-        .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 12px 20px;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            width: 100%;
-            text-align: left;
-        }
-        
-        .nav-link:hover {
-            background: rgba(255,255,255,0.1);
-            color: white;
-        }
-        
-        .nav-link.active {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border-right: 3px solid white;
-        }
-        
-        .nav-link i {
-            width: 20px;
-            margin-right: 10px;
-        }
-        
-        .main-content {
-            margin-left: 280px;
-            margin-right: 320px;
-            min-height: 100vh;
-            padding: 30px;
-        }
-        
-        .right-panel {
-            position: fixed;
-            top: 0;
-            right: 0;
-            height: 100vh;
-            width: 320px;
-            background: white;
-            border-left: 1px solid #e9ecef;
-            z-index: 999;
-            overflow-y: auto;
-            padding: 30px 20px;
-        }
-        
-        .content-section {
-            display: none;
-        }
-        
-        .content-section.active {
-            display: block;
-        }
-        
-        .dashboard-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border: none;
-            margin-bottom: 20px;
-        }
-        
-        .page-header {
-            margin-bottom: 30px;
-        }
-        
-        .page-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2c3e50;
-        }
-        
-        .stat-card {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 15px;
-        }
-        
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        
-        .stat-label {
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-        
-        .exam-count-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-
-        .exam-count-name {
-            font-weight: 500;
-            font-size: 0.9rem;
-            color: #495057;
-            flex: 1;
-            margin-right: 10px;
-            word-wrap: break-word;
-        }
-
-        .exam-count-badge {
-            background: #4285f4;
-            color: white;
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            flex-shrink: 0;
-        }
-        
-        .user-avatar-sm {
-            width: 35px;
-            height: 35px;
-            border-radius: 50%;
-            background: #e9ecef;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #6c757d;
-        }
-        
-        .filter-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-            padding: 25px;
-            margin-bottom: 30px;
-        }
-
-        .form-control, .form-select {
-            border-radius: 10px;
-            border: 2px solid #e9ecef;
-            padding: 12px 15px;
-            font-family: "Century Gothic";
-        }
-
-        .form-control:focus, .form-select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 10px;
-            padding: 12px 25px;
-            font-family: "Century Gothic";
-            font-weight: 600;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
-            transform: translateY(-1px);
-        }
-
-        .btn-danger {
-            border-radius: 8px;
-            padding: 8px 15px;
-        }
-
-        .btn-warning {
-            border-radius: 8px;
-            padding: 8px 15px;
-        }
-
-        .alert {
-            border-radius: 10px;
-            border: none;
-            padding: 15px 20px;
-            margin-bottom: 20px;
-        }
-
-        .bulk-actions {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 20px;
-            border: 2px solid #e9ecef;
-        }
-        
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-            
-            .sidebar.mobile-open {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 0;
-                margin-right: 0;
-            }
-            
-            .right-panel {
-                display: none;
-            }
-        }
-    </style>
+    <link href="viewData.css" rel="stylesheet">
 </head>
 <body>
     <div class="sidebar">
