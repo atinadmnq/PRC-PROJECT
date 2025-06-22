@@ -155,7 +155,7 @@ if ($exam !== '') {
             left: 0;
             height: 100vh;
             width: 280px;
-            background: linear-gradient(135deg, rgb(134, 65, 244) 0%, rgb(66, 165, 245) 100%);
+            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
             color: white;
             z-index: 1000;
             transition: all 0.3s ease;
@@ -355,7 +355,7 @@ if ($exam !== '') {
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
             border: none;
             border-radius: 10px;
             padding: 12px 25px;
@@ -364,7 +364,7 @@ if ($exam !== '') {
         }
 
         .btn-primary:hover {
-            background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
             transform: translateY(-1px);
         }
     </style>

@@ -209,7 +209,7 @@ try {
         .user-avatar-sm {
             width: 35px;
             height: 35px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
             border-radius: 50%;
             display: flex;
             align-items: center;
