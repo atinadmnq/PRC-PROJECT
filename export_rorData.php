@@ -98,7 +98,7 @@ try {
     $sheet->setTitle('ROR Export');
     
     // Set headers with additional columns
-    $headers = ['ID', 'Name', 'Examination', 'Exam Date', 'Upload Timestamp', 'Status'];
+    $headers = ['ID', 'Name', 'Examination', 'Exam Date'];
     $sheet->fromArray($headers, null, 'A1');
     
     // Style the header row
@@ -109,7 +109,7 @@ try {
             'startColor' => ['rgb' => 'E2E8F0']
         ]
     ];
-    $sheet->getStyle('A1:F1')->applyFromArray($headerStyle);
+    $sheet->getStyle('A1:D1')->applyFromArray($headerStyle);
     
     // Add data rows
     $row = 2;
@@ -118,13 +118,11 @@ try {
         $sheet->setCellValue("B$row", $d['name']);
         $sheet->setCellValue("C$row", $d['examination']);
         $sheet->setCellValue("D$row", $d['exam_date']);
-        $sheet->setCellValue("E$row", $d['upload_timestamp']);
-        $sheet->setCellValue("F$row", $d['status']);
         $row++;
     }
     
     // Auto-size columns
-    foreach (range('A', 'F') as $col) {
+    foreach (range('A', 'D') as $col) {
         $sheet->getColumnDimension($col)->setAutoSize(true);
     }
     
