@@ -281,32 +281,49 @@ try {
                 ?>
             <?php endif; ?>
 
-            <!-- Filter Card -->
-            <div class="filter-card">
-                <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
-                <form method="get" action="" id="filterForm">
-                    <div class="row align-items-end">
-                        <div class="col-md-4">
-                            <label for="examSelect" class="form-label"><i class="fas fa-graduation-cap me-1"></i>Select Examination</label>
-                            <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
-                                <option value="">-- Choose an examination --</option>
-                                <?php foreach ($examinations as $examination): ?>
-                                    <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($examination) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="searchName" class="form-label"><i class="fas fa-search me-1"></i>Search Name</label>
-                            <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-2"></i>Search</button>
-                        </div>
-                    </div>
-                </form>
+           
+        <!-- Filter Card -->
+        <div class="filter-card">
+            <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
+
+        <!-- SEARCH FORM -->
+        <form method="get" action="" id="filterForm">
+        <div class="row align-items-end">
+            <div class="col-md-4">
+                <label for="examSelect" class="form-label">
+                <i class="fas fa-graduation-cap me-1"></i>Select Examination
+                </label>
+            <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
+                <option value="">-- Choose an examination --</option>
+                <?php foreach ($examinations as $examination): ?>
+                <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($examination) ?>
+                </option>
+                <?php endforeach; ?>
+                </select>
             </div>
+            <div class="col-md-4">
+                <label for="searchName" class="form-label">
+                <i class="fas fa-search me-1"></i>Search Name
+                </label>
+                <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">
+                    <i class="fas fa-search me-2"></i>Search
+                </button>
+                <button type="button" class="btn btn-success flex-fill" onclick="submitExportForm()">
+                    <i class="fas fa-file-excel me-1"></i>Export
+                </button>
+            </div>
+            </div>
+            </form>
+
+        <form method="post" action="export_rorData.php" id="exportForm" style="display:none;">
+        <input type="hidden" name="exam" id="exportExam">
+        <input type="hidden" name="search_name" id="exportSearch">
+        </form>
+        </div>
 
             <!-- Data Table Card -->
             <?php if (!empty($data)): ?>
@@ -623,6 +640,15 @@ try {
                 }
             });
         }, 5000);
+
+        
+        function submitExportForm() {
+        // Copy values from the visible form
+        document.getElementById('exportExam').value = document.getElementById('examSelect').value;
+        document.getElementById('exportSearch').value = document.getElementById('searchName').value;
+        document.getElementById('exportForm').submit();
+        }
+
     </script>
 </body>
 </html>
