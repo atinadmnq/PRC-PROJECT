@@ -89,6 +89,78 @@ if (isset($_POST['release_id'])) {
     exit();
 }
 
+// Handle bulk release action
+if (isset($_POST['bulk_release'])) {
+    $selected_ids = $_POST['selected_records'] ?? [];
+    
+    if (!empty($selected_ids)) {
+        $success_count = 0;
+        $failed_count = 0;
+        
+        try {
+            $pdo->beginTransaction();
+            
+            foreach ($selected_ids as $id) {
+                $id = intval($id);
+                
+                $stmt = $pdo->prepare("SELECT name, examination, exam_date, status, upload_timestamp FROM rts_data_onhold WHERE id = ?");
+                $stmt->execute([$id]);
+                $examinee_data = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($examinee_data) {
+                    $delete_stmt = $pdo->prepare("DELETE FROM rts_data_onhold WHERE id = ?");
+                    if ($delete_stmt->execute([$id])) {
+                        $success_count++;
+                        
+                        logReleaseActivity(
+                            $pdo,
+                            $_SESSION['user_id'] ?? null,
+                            $_SESSION['full_name'] ?? $accountName,
+                            $examinee_data['name'],
+                            'bulk',
+                            "Released RTS record: Name = {$examinee_data['name']}, Exam = {$examinee_data['examination']}, Date = {$examinee_data['exam_date']}, Status = {$examinee_data['status']}, Uploaded = {$examinee_data['upload_timestamp']}"
+                        );
+                    } else {
+                        $failed_count++;
+                    }
+                } else {
+                    $failed_count++;
+                }
+            }
+            
+            $pdo->commit();
+            
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'] ?? null,
+                $_SESSION['full_name'] ?? $accountName,
+                'bulk_release_summary',
+                "Bulk release completed - Success: {$success_count}, Failed: {$failed_count}"
+            );
+            
+            $_SESSION['release_message'] = "Bulk release completed: {$success_count} successful, {$failed_count} failed";
+            $_SESSION['release_status'] = $failed_count > 0 ? 'warning' : 'success';
+            
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'] ?? null,
+                $_SESSION['full_name'] ?? $accountName,
+                'bulk_release_failed',
+                "Bulk release failed - Error: " . $e->getMessage()
+            );
+            
+            $_SESSION['release_message'] = "Bulk release failed: " . $e->getMessage();
+            $_SESSION['release_status'] = 'error';
+        }
+        
+        header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
+        exit();
+    }
+}
+
 // Fetch examination list
 $sql = "SELECT DISTINCT examination FROM rts_data_onhold ORDER BY upload_timestamp DESC";
 $result = $pdo->query($sql);
@@ -142,6 +214,7 @@ if ($exam !== '') {
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+        <link href="rtsTableView.css" rel="stylesheet">
     <style>
         body {
             background: #f8f9fa;
@@ -150,262 +223,7 @@ if ($exam !== '') {
             padding: 0;
         }
 
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            width: 280px;
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
-            color: white;
-            z-index: 1000;
-            transition: all 0.3s ease;
-        }
-        
-        .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .sidebar-brand {
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-decoration: none;
-            color: white;
-        }
-        
-        .sidebar-brand:hover {
-            color: white;
-        }
-        
-        .user-info {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-        
-        .user-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 10px;
-            font-size: 1.5rem;
-        }
-        
-        .nav-menu {
-            padding: 20px 0;
-        }
-        
-        .nav-item {
-            margin-bottom: 5px;
-        }
-        
-        .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 12px 20px;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            width: 100%;
-            text-align: left;
-        }
-        
-        .nav-link:hover {
-            background: rgba(255,255,255,0.1);
-            color: white;
-        }
-        
-        .nav-link.active {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border-right: 3px solid white;
-        }
-        
-        .nav-link i {
-            width: 20px;
-            margin-right: 10px;
-        }
-        
-        .main-content {
-            margin-left: 280px;
-            margin-right: 320px;
-            min-height: 100vh;
-            padding: 30px;
-        }
-        
-        .right-panel {
-            position: fixed;
-            top: 0;
-            right: 0;
-            height: 100vh;
-            width: 320px;
-            background: white;
-            border-left: 1px solid #e9ecef;
-            z-index: 999;
-            overflow-y: auto;
-            padding: 30px 20px;
-        }
-        
-        .dashboard-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border: none;
-            margin-bottom: 20px;
-        }
-        
-        .page-header {
-            margin-bottom: 30px;
-        }
-        
-        .page-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2c3e50;
-        }
 
-        .stat-card {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 15px;
-        }
-        
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        
-        .stat-label {
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-
-        .filter-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-            padding: 25px;
-            margin-bottom: 30px;
-        }
-
-        .form-control, .form-select {
-            border-radius: 10px;
-            border: 2px solid #e9ecef;
-            padding: 12px 15px;
-            font-family: "Century Gothic";
-        }
-
-        .form-control:focus, .form-select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
-            border: none;
-            border-radius: 10px;
-            padding: 12px 25px;
-            font-family: "Century Gothic";
-            font-weight: 600;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
-            transform: translateY(-1px);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            border: none;
-            border-radius: 8px;
-            padding: 8px 15px;
-            font-family: "Century Gothic";
-            font-size: 14px;
-        }
-
-        .btn-danger:hover {
-            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-            transform: translateY(-1px);
-        }
-
-        .table {
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-        }
-
-        .table th {
-            background: linear-gradient(135deg,rgb(26, 43, 121) 0%,rgb(42, 96, 184) 100%);
-            color: white;
-            border: none;
-            padding: 15px;
-            font-weight: 600;
-            font-family: "Century Gothic";
-        }
-
-        .table td {
-            padding: 15px;
-            border-color: #e9ecef;
-            font-family: "Century Gothic";
-        }
-
-        .table tbody tr:hover {
-            background-color: #f8f9fa;
-        }
-
-        .exam-count-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-        
-        .exam-count-name {
-            font-weight: 500;
-            font-size: 0.9rem;
-            color: #495057;
-        }
-        
-        .exam-count-badge {
-            background: #4285f4;
-            color: white;
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-            
-            .sidebar.mobile-open {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 0;
-                margin-right: 0;
-            }
-            
-            .right-panel {
-                display: none;
-            }
-        }
     </style>
 </head>
 <body>
@@ -470,75 +288,329 @@ if ($exam !== '') {
 
         <!-- Data Table -->
         <?php if (!empty($data)): ?>
-            <div class="dashboard-card">
-                <div class="card-header bg-transparent">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-list me-2"></i>RTS Data for: <?= htmlspecialchars($exam) ?>
-                        <span class="badge bg-primary ms-2"><?= count($data) ?> records</span>
-                    </h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead>
-                                <tr>
-                                    <th><i class="fas fa-hashtag me-1"></i>ID</th>
-                                    <th><i class="fas fa-user me-1"></i>Name</th>
-                                    <th><i class="fas fa-graduation-cap me-1"></i>Examination</th>
-                                    <th><i class="fas fa-calendar me-1"></i>Exam Date</th>
-                                    <th><i class="fas fa-clock me-1"></i>Upload Timestamp</th>
-                                    <th><i class="fas fa-info-circle me-1"></i>Status</th>
-                                    <th><i class="fas fa-cog me-1"></i>Action</th> 
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($data as $row): ?>
-                                    <tr>
-                                        <td><strong><?= htmlspecialchars($row['id']) ?></strong></td>
-                                        <td><?= htmlspecialchars($row['name']) ?></td>
-                                        <td>
-                                            <span class="badge bg-info"><?= htmlspecialchars($row['examination']) ?></span>
-                                        </td>
-                                        <td><?= htmlspecialchars($row['exam_date']) ?></td>
-                                        <td>
-                                            <small class="text-muted">
-                                                <?= htmlspecialchars(date("M d, Y", strtotime($row['upload_timestamp']))) ?><br>
-                                                <?= htmlspecialchars(date("h:i A", strtotime($row['upload_timestamp']))) ?>
-                                            </small>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-warning"><?= htmlspecialchars($row['status']) ?></span>
-                                        </td>
-                                        <td>
-                                            <form method="post" action="" class="d-inline" onsubmit="return confirm('Are you sure you want to release (delete) this record?');">
-                                                <input type="hidden" name="release_id" value="<?= htmlspecialchars($row['id']) ?>">
-                                                <button type="submit" class="btn btn-danger btn-sm">
-                                                    <i class="fas fa-unlock me-1"></i>Release
-                                                </button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+            <!-- Bulk Actions -->
+            <div class="bulk-actions">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="selectAll">
+                            <label class="form-check-label fw-medium" for="selectAll">
+                                Select All Records
+                            </label>
+                        </div>
+                    </div>
+                     <div class="col-auto">
+                        <button type="button" class="btn btn-warning" onclick="bulkRelease()" disabled id="bulkReleaseBtn">
+                            <i class="fas fa-trash-alt me-2"></i>Release Selected
+                        </button>
                     </div>
                 </div>
             </div>
-        <?php elseif ($exam !== ''): ?>
-            <div class="dashboard-card">
-                <div class="card-body text-center py-5">
-                    <i class="fas fa-search fa-4x text-muted mb-3"></i>
-                    <h5 class="text-muted">No Records Found</h5>
-                    <p class="text-muted">No records found for examination: <strong><?= htmlspecialchars($exam) ?></strong></p>
-                    <?php if ($search_name !== ''): ?>
-                        <p class="text-muted">with name containing: <strong><?= htmlspecialchars($search_name) ?></strong></p>
-                    <?php endif; ?>
+
+            <div class="card dashboard-card">
+                <div class="card-header bg-transparent">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>RTS Data Records</h5>
+                        </div>
+                        <div class="col-auto">
+                            <span class="badge bg-info"><?= count($data) ?> records found</span>
+                        </div>
+                    </div>
+                 <div class="card-body p-0">
+                    <form id="bulkForm" method="post" action="">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th width="50"><input type="checkbox" id="selectAllTable" class="form-check-input"></th>
+                                        <th><i class="fas fa-hashtag me-1"></i>ID</th>
+                                        <th><i class="fas fa-user me-1"></i>Name</th>
+                                        <th><i class="fas fa-file-alt me-1"></i>Examination</th>
+                                        <th><i class="fas fa-calendar me-1"></i>Exam Date</th>
+                                        <th><i class="fas fa-upload me-1"></i>Upload Timestamp</th>
+                                        <th><i class="fas fa-info-circle me-1"></i>Status</th>
+                                        <th><i class="fas fa-cog me-1"></i>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($data as $row): ?>
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" name="selected_records[]" value="<?= htmlspecialchars($row['id']) ?>" class="form-check-input record-checkbox">
+                                            </td>
+                                            <td><?= htmlspecialchars($row['id']) ?></td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
+                                                    <span class="fw-medium"><?= htmlspecialchars($row['name']) ?></span>
+                                                </div>
+                                            </td>
+                                            <td><?= htmlspecialchars($row['examination']) ?></td>
+                                            <td>
+                                                <i class="fas fa-calendar-alt me-1 text-muted"></i>
+                                                <?= htmlspecialchars($row['exam_date']) ?>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-clock me-1"></i>
+                                                    <?= htmlspecialchars(date("M-d-Y H:i:s", strtotime($row['upload_timestamp']))) ?>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success">
+                                                    <?= htmlspecialchars($row['status']) ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <form method="post" action="" onsubmit="return confirmRelease('<?= htmlspecialchars($row['name']) ?>');" class="d-inline">
+                                                    <input type="hidden" name="release_id" value="<?= htmlspecialchars($row['id']) ?>">
+                                                    <input type="hidden" name="examinee_name" value="<?= htmlspecialchars($row['name']) ?>">
+                                                    <input type="hidden" name="examination" value="<?= htmlspecialchars($row['examination']) ?>">
+                                                    <button type="submit" class="btn btn-danger btn-sm">
+                                                        <i class="fas fa-trash me-1"></i>Release
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
                 </div>
             </div>
-        <?php endif; ?>
+        <?php elseif ($exam !== ''): ?>
+            <div class="card dashboard-card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No records found</h5>
+                    <p class="text-muted">No records found for examination: <strong><?= htmlspecialchars($exam) ?></strong></p>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
     </div>
 
+    <!-- Confirmation Modal -->
+    <div class="modal fade" id="confirmReleaseModal" tabindex="-1" aria-labelledby="confirmReleaseModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmReleaseModalLabel">
+                        <i class="fas fa-exclamation-triangle text-warning me-2"></i>Confirm Release
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">Are you sure you want to release the following record(s)?</p>
+                    <div id="releaseConfirmationContent"></div>
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Note:</strong> This action will permanently delete the record(s) from the system and cannot be undone.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Cancel
+                    </button>
+                    <button type="button" class="btn btn-danger" id="confirmReleaseBtn">
+                        <i class="fas fa-trash me-2"></i>Confirm Release
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Navigation functionality
+        document.querySelectorAll('.nav-link[data-section]').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+                document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+                document.getElementById(this.getAttribute('data-section')).classList.add('active');
+            });
+        });
+
+        document.querySelectorAll('button[data-section]').forEach(button => {
+            button.addEventListener('click', function() {
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                const targetSection = this.getAttribute('data-section');
+                document.querySelector(`.nav-link[data-section="${targetSection}"]`).classList.add('active');
+                document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+                document.getElementById(targetSection).classList.add('active');
+            });
+        });
+
+        // Activity log filtering
+        if (document.getElementById('activityFilter')) {
+            document.getElementById('activityFilter').addEventListener('change', function() {
+                const filter = this.value;
+                document.querySelectorAll('.activity-row').forEach(row => {
+                    row.style.display = (filter === 'all' || row.getAttribute('data-action') === filter) ? '' : 'none';
+                });
+            });
+        }
+
+        // Enhanced confirmation function for individual releases
+        function confirmRelease(examineeName) {
+            return confirm(`Are you sure you want to release (delete) the record for "${examineeName}"?\n\nThis action cannot be undone.`);
+        }
+
+        // Checkbox functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectAllMain = document.getElementById('selectAll');
+            const selectAllTable = document.getElementById('selectAllTable');
+            const recordCheckboxes = document.querySelectorAll('.record-checkbox');
+            const bulkReleaseBtn = document.getElementById('bulkReleaseBtn');
+
+            // Function to update bulk release button state
+            function updateBulkReleaseButton() {
+                const checkedBoxes = document.querySelectorAll('.record-checkbox:checked');
+                if (bulkReleaseBtn) {
+                    bulkReleaseBtn.disabled = checkedBoxes.length === 0;
+                }
+            }
+
+            // Select all functionality
+            if (selectAllMain) {
+                selectAllMain.addEventListener('change', function() {
+                    recordCheckboxes.forEach(checkbox => {
+                        checkbox.checked = this.checked;
+                    });
+                    if (selectAllTable) selectAllTable.checked = this.checked;
+                    updateBulkReleaseButton();
+                });
+            }
+
+            if (selectAllTable) {
+                selectAllTable.addEventListener('change', function() {
+                    recordCheckboxes.forEach(checkbox => {
+                        checkbox.checked = this.checked;
+                    });
+                    if (selectAllMain) selectAllMain.checked = this.checked;
+                    updateBulkReleaseButton();
+                });
+            }
+
+            // Individual checkbox functionality
+            recordCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const allChecked = Array.from(recordCheckboxes).every(cb => cb.checked);
+                    const anyChecked = Array.from(recordCheckboxes).some(cb => cb.checked);
+                    
+                    if (selectAllMain) selectAllMain.checked = allChecked;
+                    if (selectAllTable) selectAllTable.checked = allChecked;
+                    
+                    updateBulkReleaseButton();
+                });
+            });
+
+            // Initialize button state
+            updateBulkReleaseButton();
+        });
+
+        // Bulk release functionality
+        function bulkRelease() {
+            const checkedBoxes = document.querySelectorAll('.record-checkbox:checked');
+            
+            if (checkedBoxes.length === 0) {
+                alert('Please select at least one record to release.');
+                return;
+            }
+
+            // Get selected record details for confirmation
+            const selectedRecords = [];
+            checkedBoxes.forEach(checkbox => {
+                const row = checkbox.closest('tr');
+                const name = row.querySelector('td:nth-child(3) span').textContent;
+                const examination = row.querySelector('td:nth-child(4)').textContent;
+                selectedRecords.push({name, examination});
+            });
+
+            // Show confirmation modal
+            showBulkReleaseModal(selectedRecords, checkedBoxes);
+        }
+
+        function showBulkReleaseModal(selectedRecords, checkedBoxes) {
+            const modal = new bootstrap.Modal(document.getElementById('confirmReleaseModal'));
+            const content = document.getElementById('releaseConfirmationContent');
+            
+            let html = `<div class="alert alert-info">
+                <strong>${selectedRecords.length}</strong> record(s) selected for release:
+            </div>
+            <div class="list-group" style="max-height: 200px; overflow-y: auto;">`;
+            
+            selectedRecords.slice(0, 10).forEach(record => {
+                html += `<div class="list-group-item">
+                    <strong>${record.name}</strong><br>
+                    <small class="text-muted">${record.examination}</small>
+                </div>`;
+            });
+            
+            if (selectedRecords.length > 10) {
+                html += `<div class="list-group-item text-center text-muted">
+                    ... and ${selectedRecords.length - 10} more record(s)
+                </div>`;
+            }
+            
+            html += '</div>';
+            content.innerHTML = html;
+            
+            // Set up confirm button
+            document.getElementById('confirmReleaseBtn').onclick = function() {
+                // Create form with selected IDs
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.style.display = 'none';
+                
+                // Add bulk release indicator
+                const bulkInput = document.createElement('input');
+                bulkInput.type = 'hidden';
+                bulkInput.name = 'bulk_release';
+                bulkInput.value = '1';
+                form.appendChild(bulkInput);
+                
+                // Add selected record IDs
+                checkedBoxes.forEach(checkbox => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'selected_records[]';
+                    input.value = checkbox.value;
+                    form.appendChild(input);
+                });
+                
+                document.body.appendChild(form);
+                form.submit();
+            };
+            
+            modal.show();
+        }
+
+        // Auto-hide alerts after 5 seconds
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                if (alert.classList.contains('alert-dismissible')) {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }
+            });
+        }, 5000);
+
+        
+        function submitExportForm() {
+        // Copy values from the visible form
+        document.getElementById('exportExam').value = document.getElementById('examSelect').value;
+        document.getElementById('exportSearch').value = document.getElementById('searchName').value;
+        document.getElementById('exportForm').submit();
+        }
+
+    </script>
 </body>
 </html>
 
