@@ -201,10 +201,6 @@ if ($exam !== '') {
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
-
-
-
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -214,7 +210,7 @@ if ($exam !== '') {
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-        <link href="rtsTableView.css" rel="stylesheet">
+    <link href="rtsTableView.css" rel="stylesheet">
     <style>
         body {
             background: #f8f9fa;
@@ -222,12 +218,22 @@ if ($exam !== '') {
             margin: 0;
             padding: 0;
         }
-
-
     </style>
 </head>
 <body>
     <?php include 'admin_panel.php'; ?>
+    
+    <!-- Display Messages -->
+    <?php if (isset($_SESSION['release_message'])): ?>
+        <div class="alert alert-<?= $_SESSION['release_status'] ?> alert-dismissible fade show" role="alert">
+            <i class="fas fa-info-circle me-2"></i>
+            <?= htmlspecialchars($_SESSION['release_message']) ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        <?php unset($_SESSION['release_message'], $_SESSION['release_status']); ?>
+    <?php endif; ?>
+
+  
     
     <!-- Right Side Panel for Summary -->
     <div class="right-panel">
@@ -259,31 +265,47 @@ if ($exam !== '') {
             <p class="text-muted">Manage and review uploaded RTS examination data</p>
         </div>
 
-        <!-- Filter Card -->
+         <!-- Filter Card -->
         <div class="filter-card">
             <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
-            <form method="get" action="" id="filterForm">
-                <div class="row align-items-end">
-                    <div class="col-md-4">
-                        <label for="examSelect" class="form-label"><i class="fas fa-graduation-cap me-1"></i>Select Examination</label>
-                        <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
-                            <option value="">-- Choose an examination --</option>
-                            <?php foreach ($examinations as $examination): ?>
-                                <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($examination) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="searchName" class="form-label"><i class="fas fa-search me-1"></i>Search Name</label>
-                        <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
-                    </div>
-                    <div class="col-md-4">
-                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-2"></i>Search</button>
-                    </div>
-                </div>
+
+        <!-- SEARCH FORM -->
+        <form method="get" action="" id="filterForm">
+        <div class="row align-items-end">
+            <div class="col-md-4">
+                <label for="examSelect" class="form-label">
+                <i class="fas fa-graduation-cap me-1"></i>Select Examination
+                </label>
+            <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
+                <option value="">-- Choose an examination --</option>
+                <?php foreach ($examinations as $examination): ?>
+                <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($examination) ?>
+                </option>
+                <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="searchName" class="form-label">
+                <i class="fas fa-search me-1"></i>Search Name
+                </label>
+                <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">
+                    <i class="fas fa-search me-2"></i>Search
+                </button>
+                <button type="button" class="btn btn-success flex-fill" onclick="submitExportForm()">
+                    <i class="fas fa-file-excel me-1"></i>Export
+                </button>
+            </div>
+            </div>
             </form>
+
+         <form method="post" action="export_rtsData.php" id="exportForm" style="display:none;">
+        <input type="hidden" name="exam" id="exportExam">
+        <input type="hidden" name="search_name" id="exportSearch">
+        </form>
         </div>
 
         <!-- Data Table -->
@@ -299,7 +321,7 @@ if ($exam !== '') {
                             </label>
                         </div>
                     </div>
-                     <div class="col-auto">
+                    <div class="col-auto">
                         <button type="button" class="btn btn-warning" onclick="bulkRelease()" disabled id="bulkReleaseBtn">
                             <i class="fas fa-trash-alt me-2"></i>Release Selected
                         </button>
@@ -317,7 +339,8 @@ if ($exam !== '') {
                             <span class="badge bg-info"><?= count($data) ?> records found</span>
                         </div>
                     </div>
-                 <div class="card-body p-0">
+                </div>
+                <div class="card-body p-0">
                     <form id="bulkForm" method="post" action="">
                         <div class="table-responsive">
                             <table class="table table-hover mb-0">
@@ -388,8 +411,7 @@ if ($exam !== '') {
                     <p class="text-muted">No records found for examination: <strong><?= htmlspecialchars($exam) ?></strong></p>
                 </div>
             </div>
-            <?php endif; ?>
-        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Confirmation Modal -->
@@ -421,7 +443,6 @@ if ($exam !== '') {
             </div>
         </div>
     </div>
-
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -455,6 +476,7 @@ if ($exam !== '') {
                 });
             });
         }
+
 
         // Enhanced confirmation function for individual releases
         function confirmRelease(examineeName) {
@@ -543,7 +565,7 @@ if ($exam !== '') {
             let html = `<div class="alert alert-info">
                 <strong>${selectedRecords.length}</strong> record(s) selected for release:
             </div>
-            <div class="list-group" style="max-height: 200px; overflow-y: auto;">`;
+            <div class="list-groupstyle="max-height: 200px; overflow-y: auto;">`;
             
             selectedRecords.slice(0, 10).forEach(record => {
                 html += `<div class="list-group-item">
@@ -609,7 +631,6 @@ if ($exam !== '') {
         document.getElementById('exportSearch').value = document.getElementById('searchName').value;
         document.getElementById('exportForm').submit();
         }
-
     </script>
 </body>
 </html>
