@@ -173,7 +173,7 @@ if (!empty($recentActivities)) {
         }
         
         .stats-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
             color: white;
             border-radius: 15px;
             padding: 30px;
@@ -193,6 +193,9 @@ if (!empty($recentActivities)) {
         
         #fonty {
             font-family: "Century Gothic";
+        }
+        #font {
+
         }
         
         .fonty {
@@ -226,14 +229,15 @@ if (!empty($recentActivities)) {
         <div id="dashboard" class="content-section active">
             <div class="page-header">
                 <h1 class="page-title">
-                    <i class="fas fa-tachometer-alt me-3" id="fonty"></i>Staff Dashboard
-                </h1>
+    <i class='fas fa-user-friends' id='font'></i>
+    <span id='fonty'>Staff Dashboard</span>
+</h1>
                 <p class="text-muted">Report of Rating Issuance Logistics and Inventory System</p>
             </div>
 
             <div class="row mb-4">
                 <div class="col-md-3 mb-3">
-                    <div class="stats-card">
+                    <div class="stats-card" style="background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);">
                         <div class="mb-2">
                             <i class="fas fa-file-alt fa-2x"></i>
                         </div>
@@ -242,7 +246,7 @@ if (!empty($recentActivities)) {
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
-                    <div class="stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <div class="stats-card" style="background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);">
                         <div class="mb-2">
                             <i class="fas fa-clock fa-2x"></i>
                         </div>
@@ -252,7 +256,7 @@ if (!empty($recentActivities)) {
                 </div>
                 <!-- Add more stats cards if needed -->
                 <div class="col-md-3 mb-3">
-                    <div class="stats-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <div class="stats-card" style="background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);">
                         <div class="mb-2">
                             <i class="fas fa-users fa-2x"></i>
                         </div>

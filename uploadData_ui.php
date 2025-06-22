@@ -316,7 +316,7 @@ require_once 'activity_logger.php';
             </div>
         <?php endif; ?>
 
-        <div class="card dashboard-card">
+
             <div class="card-body">
                 <div class="upload-container">
                     <!-- Horizontal Upload Form -->
@@ -353,7 +353,7 @@ require_once 'activity_logger.php';
                 </div>
             </div>
         </div>
-    </div>
+
 
    
 
