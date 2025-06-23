@@ -32,9 +32,6 @@ if ((!isset($_SESSION['full_name']) || !isset($_SESSION['role'])) && isset($_SES
     }
 }
 
-// Debug: Check what role is set (remove this after testing)
-// echo "Current role: " . ($_SESSION['role'] ?? 'NOT SET') . "<br>";
-
 // Handle logout
 if (isset($_GET['logout'])) {
     // Log logout activity
@@ -58,7 +55,7 @@ function logActivity($pdo, $userId, $userName, $action, $description, $additiona
     }
 }
 
-// Fetch activity logs with enhanced query (removed IP address)
+// Fetch activity logs with enhanced query
 try {
     $activity_logs = $pdo->query("
         SELECT
@@ -69,6 +66,10 @@ try {
                 WHEN al.activity_type = 'logout' THEN 'danger'
                 WHEN al.activity_type = 'upload_ror' THEN 'info'
                 WHEN al.activity_type = 'upload_rts' THEN 'warning'
+                WHEN al.activity_type = 'release_ror' THEN 'primary'
+                WHEN al.activity_type = 'release_rts' THEN 'primary'
+                WHEN al.activity_type = 'export_ror' THEN 'download'
+                WHEN al.activity_type = 'export_rts' THEN 'download'
                 WHEN al.activity_type = 'release' THEN 'primary'
                 WHEN al.activity_type = 'create' THEN 'primary'
                 WHEN al.activity_type = 'update' THEN 'warning'
@@ -80,6 +81,8 @@ try {
                 WHEN al.activity_type = 'logout' THEN 'sign-out-alt'
                 WHEN al.activity_type = 'upload_ror' THEN 'file-upload'
                 WHEN al.activity_type = 'upload_rts' THEN 'file-upload'
+                WHEN al.activity_type = 'release_ror' THEN 'paper-plane'
+                WHEN al.activity_type = 'release_rts' THEN 'paper-plane'
                 WHEN al.activity_type = 'release' THEN 'paper-plane'
                 WHEN al.activity_type = 'create' THEN 'plus'
                 WHEN al.activity_type = 'update' THEN 'edit'
@@ -154,6 +157,21 @@ if (isset($_GET['test'])) {
             /* Add any admin-specific overrides here if needed */
         }
         <?php endif; ?>
+
+        /* Debug info */
+        .debug-info {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: #fff;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 1000;
+            max-width: 300px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -202,12 +220,12 @@ if (isset($_GET['test'])) {
                         <option value="all">All Activities</option>
                         <option value="login">Login Activities</option>
                         <option value="logout">Logout Activities</option>
-                        <option value="upload_ror">ROR Uploads</option>
-                        <option value="upload_rts">RTS Uploads</option>
-                        <option value="release">Releases</option>
-                        <option value="create">Create Activities</option>
-                        <option value="update">Update Activities</option>
-                        <option value="delete">Delete Activities</option>
+                        <option value="upload_ror">Upload ROR</option>
+                        <option value="upload_rts">Upload RTS</option>
+                        <option value="release_ror">Release ROR</option>
+                        <option value="release_rts">Release RTS</option>
+                        <option value="export_ror">Export ROR</option>
+                        <option value="export_rts">Export RTS</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -243,6 +261,9 @@ if (isset($_GET['test'])) {
                             </button>
                             <button class="btn btn-outline-success btn-sm" onclick="exportActivityLog()">
                                 <i class="fas fa-download me-1"></i>Export
+                            </button>
+                            <button class="btn btn-outline-info btn-sm" onclick="toggleDebug()">
+                                <i class="fas fa-bug me-1"></i>Debug
                             </button>
                         </div>
                     </div>
@@ -293,22 +314,19 @@ if (isset($_GET['test'])) {
                                                         $actionDisplay = 'Logout';
                                                         break;
                                                     case 'upload_ror':
-                                                        $actionDisplay = 'ROR Upload';
+                                                        $actionDisplay = 'Upload ROR';
                                                         break;
                                                     case 'upload_rts':
-                                                        $actionDisplay = 'RTS Upload';
+                                                        $actionDisplay = 'Upload RTS';
+                                                        break;
+                                                    case 'release_ror':
+                                                        $actionDisplay = 'Release ROR';
+                                                        break;
+                                                    case 'release_rts':
+                                                        $actionDisplay = 'Release RTS';
                                                         break;
                                                     case 'release':
                                                         $actionDisplay = 'Release';
-                                                        break;
-                                                    case 'create':
-                                                        $actionDisplay = 'Create';
-                                                        break;
-                                                    case 'update':
-                                                        $actionDisplay = 'Update';
-                                                        break;
-                                                    case 'delete':
-                                                        $actionDisplay = 'Delete';
                                                         break;
                                                     default:
                                                         $actionDisplay = ucfirst($log['activity_type'] ?? 'Unknown');
@@ -349,6 +367,12 @@ if (isset($_GET['test'])) {
         </div>
     </div>
 
+    <!-- Debug Info Panel -->
+    <div id="debugInfo" class="debug-info">
+        <h6>Debug Information</h6>
+        <div id="debugContent"></div>
+    </div>
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -364,33 +388,108 @@ if (isset($_GET['test'])) {
                 const searchValue = searchFilter.value.toLowerCase();
                 const activityRows = document.querySelectorAll('.activity-row');
                 
+                let visibleCount = 0;
+                let debugInfo = {
+                    totalRows: activityRows.length,
+                    actionFilter: actionFilter,
+                    dateFilter: dateFilterValue,
+                    searchFilter: searchValue,
+                    activityTypes: new Set(),
+                    matchedRows: 0,
+                    filteredActions: []
+                };
+                
                 activityRows.forEach(row => {
                     const rowAction = row.getAttribute('data-action');
                     const rowDate = row.getAttribute('data-date');
                     const rowUser = row.getAttribute('data-user');
                     const rowDescription = row.getAttribute('data-description');
                     
-                    let showRow = true;
+                    // Collect all activity types for debugging
+                    debugInfo.activityTypes.add(rowAction);
                     
-                    // Filter by action
-                    if (actionFilter !== 'all' && rowAction !== actionFilter) {
-                        showRow = false;
+                    let showRow = true;
+                    let matchReason = [];
+                    
+                    // Filter by action - SIMPLIFIED LOGIC
+                    if (actionFilter !== 'all') {
+                        if (rowAction === actionFilter) {
+                            matchReason.push('exact_match');
+                        } else {
+                            showRow = false;
+                            matchReason.push('no_action_match');
+                        }
+                    } else {
+                        matchReason.push('show_all');
                     }
                     
                     // Filter by date
-                    if (dateFilterValue && rowDate !== dateFilterValue) {
+                    if (showRow && dateFilterValue && rowDate !== dateFilterValue) {
                         showRow = false;
+                        matchReason.push('date_mismatch');
                     }
                     
                     // Filter by search term
-                    if (searchValue && 
+                    if (showRow && searchValue && 
                         !rowUser.includes(searchValue) && 
                         !rowDescription.includes(searchValue)) {
                         showRow = false;
+                        matchReason.push('search_mismatch');
                     }
                     
-                    row.style.display = showRow ? '' : 'none';
+                    if (showRow) {
+                        row.style.display = '';
+                        visibleCount++;
+                        debugInfo.matchedRows++;
+                        if (actionFilter === 'logout') {
+                            debugInfo.filteredActions.push({
+                                action: rowAction,
+                                user: rowUser,
+                                reason: matchReason.join(', ')
+                            });
+                        }
+                    } else {
+                        row.style.display = 'none';
+                    }
                 });
+                
+                // Update the display count
+                updateActivityCount(visibleCount);
+                
+                // Update debug info
+                updateDebugInfo(debugInfo);
+            }
+            
+            function updateActivityCount(count) {
+                const countElement = document.querySelector('.card-header small');
+                if (countElement) {
+                    if (count === 0) {
+                        countElement.textContent = 'No activities match the current filters';
+                    } else if (count === 1) {
+                        countElement.textContent = 'Showing 1 activity';
+                    } else {
+                        countElement.textContent = `Showing ${count} activities`;
+                    }
+                }
+            }
+            
+            function updateDebugInfo(info) {
+                const debugContent = document.getElementById('debugContent');
+                if (debugContent) {
+                    debugContent.innerHTML = `
+                        <strong>Filter Info:</strong><br>
+                        Total Rows: ${info.totalRows}<br>
+                        Matched Rows: ${info.matchedRows}<br>
+                        Action Filter: ${info.actionFilter}<br>
+                        Date Filter: ${info.dateFilter || 'none'}<br>
+                        Search Filter: ${info.searchFilter || 'none'}<br>
+                        <br>
+                        <strong>Available Activity Types:</strong><br>
+                        ${Array.from(info.activityTypes).join(', ')}<br>
+                        ${info.filteredActions.length > 0 ? '<br><strong>Logout Matches:</strong><br>' + 
+                          info.filteredActions.map(a => `${a.user}: ${a.action} (${a.reason})`).join('<br>') : ''}
+                    `;
+                }
             }
             
             // Add event listeners
@@ -405,6 +504,9 @@ if (isset($_GET['test'])) {
             if (searchFilter) {
                 searchFilter.addEventListener('input', filterActivities);
             }
+            
+            // Initial filter to populate debug info
+            filterActivities();
         });
         
         function clearFilters() {
@@ -417,14 +519,30 @@ if (isset($_GET['test'])) {
             activityRows.forEach(row => {
                 row.style.display = '';
             });
+            
+            // Reset count display
+            const countElement = document.querySelector('.card-header small');
+            if (countElement) {
+                countElement.textContent = 'Showing last 50 activities';
+            }
+            
+            // Trigger filter to update debug info
+            const event = new Event('change');
+            document.getElementById('activityFilter').dispatchEvent(event);
         }
         
         function refreshActivityLog() {
             location.reload();
         }
         
+        function toggleDebug() {
+            const debugInfo = document.getElementById('debugInfo');
+            debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 
+                                      debugInfo.style.display === 'block' ? 'none' : 'block';
+        }
+        
         function exportActivityLog() {
-            // Create CSV content (updated to remove IP address)
+            // Create CSV content
             let csvContent = "User,Action,Description,Date & Time\n";
             
             const visibleRows = document.querySelectorAll('.activity-row[style=""], .activity-row:not([style])');
