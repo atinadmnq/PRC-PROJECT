@@ -325,6 +325,16 @@ try {
         </form>
         </div>
 
+        <div class="d-flex justify-content-end mb-2">
+        <label class="me-2">Show 
+        <select id="rowsPerPageSelect" class="form-select d-inline-block w-auto">
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+        </select> entries
+        </label>
+        </div>
+
             <!-- Data Table Card -->
             <?php if (!empty($data)): ?>
             <!-- Bulk Actions -->
@@ -361,8 +371,11 @@ try {
                     <form id="bulkForm" method="post" action="">
                         <div class="table-responsive">
                             <table class="table table-hover mb-0">
+
                                 <thead class="table-light">
                                     <tr>
+                                        <tr class="paginated-row"> 
+
                                         <th width="50"><input type="checkbox" id="selectAllTable" class="form-check-input"></th>
                                         <th><i class="fas fa-hashtag me-1"></i>ID</th>
                                         <th><i class="fas fa-user me-1"></i>Name</th>
@@ -371,6 +384,7 @@ try {
                                         <th><i class="fas fa-upload me-1"></i>Upload Timestamp</th>
                                         <th><i class="fas fa-info-circle me-1"></i>Status</th>
                                         <th><i class="fas fa-cog me-1"></i>Action</th>
+
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -461,6 +475,9 @@ try {
             </div>
         </div>
     </div>
+
+    
+
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -649,6 +666,129 @@ try {
         document.getElementById('exportForm').submit();
         }
 
+        //Pagination
+
+       document.addEventListener('DOMContentLoaded', function () {
+    // Get table body rows (excluding header)
+    const tableBody = document.querySelector('tbody');
+    if (!tableBody) return; // Exit if no table body found
+    
+    const rows = tableBody.querySelectorAll('tr');
+    const rowsPerPageSelect = document.getElementById('rowsPerPageSelect');
+    
+    // Create pagination controls if they don't exist
+    let paginationContainer = document.getElementById('paginationContainer');
+    if (!paginationContainer) {
+        // Create pagination container
+        paginationContainer = document.createElement('div');
+        paginationContainer.id = 'paginationContainer';
+        paginationContainer.className = 'd-flex justify-content-between align-items-center mt-3';
+        paginationContainer.innerHTML = `
+            <div id="pageInfo" class="text-muted">Page 1 of 1</div>
+            <div id="paginationControls" class="d-flex align-items-center gap-2">
+                <button id="prevPage" class="btn btn-outline-secondary btn-sm" disabled>
+                    <i class="fas fa-chevron-left"></i> Previous
+                </button>
+                <button id="nextPage" class="btn btn-outline-secondary btn-sm">
+                    Next <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        `;
+        
+        // Insert pagination container after the table card
+        const tableCard = document.querySelector('.table-responsive').closest('.card');
+        if (tableCard) {
+            tableCard.parentNode.insertBefore(paginationContainer, tableCard.nextSibling);
+        }
+    }
+    
+    const pageInfo = document.getElementById('pageInfo');
+    const prevBtn = document.getElementById('prevPage');
+    const nextBtn = document.getElementById('nextPage');
+    
+    let currentPage = 1;
+    let rowsPerPage = parseInt(rowsPerPageSelect.value);
+    let totalPages = Math.ceil(rows.length / rowsPerPage);
+
+    function showPage(page) {
+        const start = (page - 1) * rowsPerPage;
+        const end = start + rowsPerPage;
+
+        rows.forEach((row, index) => {
+            if (index >= start && index < end) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        totalPages = Math.ceil(rows.length / rowsPerPage);
+        
+        // Update page info
+        if (pageInfo) {
+            if (rows.length === 0) {
+                pageInfo.textContent = 'No records to display';
+            } else {
+                const displayStart = start + 1;
+                const displayEnd = Math.min(end, rows.length);
+                pageInfo.textContent = `Showing ${displayStart}-${displayEnd} of ${rows.length} entries`;
+            }
+        }
+        
+        // Update button states
+        if (prevBtn) prevBtn.disabled = page === 1;
+        if (nextBtn) nextBtn.disabled = page === totalPages || rows.length === 0;
+    }
+
+    // Event listeners
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                showPage(currentPage);
+            }
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                showPage(currentPage);
+            }
+        });
+    }
+
+    if (rowsPerPageSelect) {
+        rowsPerPageSelect.addEventListener('change', () => {
+            rowsPerPage = parseInt(rowsPerPageSelect.value);
+            currentPage = 1; // Reset to first page
+            totalPages = Math.ceil(rows.length / rowsPerPage);
+            showPage(currentPage);
+        });
+    }
+
+    // Initial setup
+    if (rows.length > 0) {
+        showPage(currentPage);
+        if (paginationContainer) paginationContainer.style.display = 'flex';
+    } else {
+        if (paginationContainer) paginationContainer.style.display = 'none';
+    }
+
+    // Update pagination when filters change (for dynamic content)
+    const observer = new MutationObserver(() => {
+        const newRows = tableBody.querySelectorAll('tr');
+        if (newRows.length !== rows.length) {
+            // Rows have changed, reinitialize
+            location.reload(); // Simple approach, or you could update the rows variable
+        }
+    });
+
+    observer.observe(tableBody, { childList: true });
+});
+
+        
     </script>
 </body>
 </html>
