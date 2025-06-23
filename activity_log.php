@@ -157,21 +157,6 @@ if (isset($_GET['test'])) {
             /* Add any admin-specific overrides here if needed */
         }
         <?php endif; ?>
-
-        /* Debug info */
-        .debug-info {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: #fff;
-            border: 1px solid #ddd;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            z-index: 1000;
-            max-width: 300px;
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -219,7 +204,6 @@ if (isset($_GET['test'])) {
                     <select class="form-select" id="activityFilter">
                         <option value="all">All Activities</option>
                         <option value="login">Login Activities</option>
-                        <option value="logout">Logout Activities</option>
                         <option value="upload_ror">Upload ROR</option>
                         <option value="upload_rts">Upload RTS</option>
                         <option value="release_ror">Release ROR</option>
@@ -261,9 +245,6 @@ if (isset($_GET['test'])) {
                             </button>
                             <button class="btn btn-outline-success btn-sm" onclick="exportActivityLog()">
                                 <i class="fas fa-download me-1"></i>Export
-                            </button>
-                            <button class="btn btn-outline-info btn-sm" onclick="toggleDebug()">
-                                <i class="fas fa-bug me-1"></i>Debug
                             </button>
                         </div>
                     </div>
@@ -367,12 +348,6 @@ if (isset($_GET['test'])) {
         </div>
     </div>
 
-    <!-- Debug Info Panel -->
-    <div id="debugInfo" class="debug-info">
-        <h6>Debug Information</h6>
-        <div id="debugContent"></div>
-    </div>
-
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -389,15 +364,8 @@ if (isset($_GET['test'])) {
                 const activityRows = document.querySelectorAll('.activity-row');
                 
                 let visibleCount = 0;
-                let debugInfo = {
-                    totalRows: activityRows.length,
-                    actionFilter: actionFilter,
-                    dateFilter: dateFilterValue,
-                    searchFilter: searchValue,
-                    activityTypes: new Set(),
-                    matchedRows: 0,
-                    filteredActions: []
-                };
+                
+                console.log('Filtering with action:', actionFilter); // Debug log
                 
                 activityRows.forEach(row => {
                     const rowAction = row.getAttribute('data-action');
@@ -405,49 +373,79 @@ if (isset($_GET['test'])) {
                     const rowUser = row.getAttribute('data-user');
                     const rowDescription = row.getAttribute('data-description');
                     
-                    // Collect all activity types for debugging
-                    debugInfo.activityTypes.add(rowAction);
+                    console.log('Row action:', rowAction); // Debug log
                     
                     let showRow = true;
-                    let matchReason = [];
                     
-                    // Filter by action - SIMPLIFIED LOGIC
+                    // Filter by action - using flexible matching
                     if (actionFilter !== 'all') {
-                        if (rowAction === actionFilter) {
-                            matchReason.push('exact_match');
-                        } else {
-                            showRow = false;
-                            matchReason.push('no_action_match');
+                        // Direct match first
+                        if (rowAction !== actionFilter) {
+                            // Try flexible matching for common variations
+                            let matches = false;
+                            
+                            switch(actionFilter) {
+                                case 'upload_ror':
+                                    matches = rowAction === 'upload_ror' || 
+                                             rowAction === 'uploadror' || 
+                                             rowAction === 'ror_upload' ||
+                                             (rowDescription && rowDescription.toLowerCase().includes('ror') && rowDescription.toLowerCase().includes('upload'));
+                                    break;
+                                case 'upload_rts':
+                                    matches = rowAction === 'upload_rts' || 
+                                             rowAction === 'uploadrts' || 
+                                             rowAction === 'rts_upload' ||
+                                             (rowDescription && rowDescription.toLowerCase().includes('rts') && rowDescription.toLowerCase().includes('upload'));
+                                    break;
+                                case 'release_ror':
+                                    matches = rowAction === 'release_ror' || 
+                                             rowAction === 'releaseror' || 
+                                             rowAction === 'ror_release' ||
+                                             (rowDescription && rowDescription.toLowerCase().includes('ror') && rowDescription.toLowerCase().includes('release'));
+                                    break;
+                                case 'release_rts':
+                                    matches = rowAction === 'release_rts' || 
+                                             rowAction === 'releaserts' || 
+                                             rowAction === 'rts_release' ||
+                                             (rowDescription && rowDescription.toLowerCase().includes('rts') && rowDescription.toLowerCase().includes('release'));
+                                    break;
+                                case 'export_ror':
+                                    matches = rowAction === 'export_ror' || 
+                                             rowAction === 'exportror' || 
+                                             rowAction === 'ror_export' ||
+                                             (rowDescription && rowDescription.toLowerCase().includes('ror') && rowDescription.toLowerCase().includes('export'));
+                                    break;
+                                case 'export_rts':
+                                    matches = rowAction === 'export_rts' || 
+                                             rowAction === 'exportrts' || 
+                                             rowAction === 'rts_export' ||
+                                             (rowDescription && rowDescription.toLowerCase().includes('rts') && rowDescription.toLowerCase().includes('export'));
+                                    break;
+                                default:
+                                    matches = false;
+                            }
+                            
+                            if (!matches) {
+                                showRow = false;
+                            }
                         }
-                    } else {
-                        matchReason.push('show_all');
                     }
                     
                     // Filter by date
-                    if (showRow && dateFilterValue && rowDate !== dateFilterValue) {
+                    if (dateFilterValue && rowDate !== dateFilterValue) {
                         showRow = false;
-                        matchReason.push('date_mismatch');
                     }
                     
                     // Filter by search term
-                    if (showRow && searchValue && 
+                    if (searchValue && 
                         !rowUser.includes(searchValue) && 
                         !rowDescription.includes(searchValue)) {
                         showRow = false;
-                        matchReason.push('search_mismatch');
                     }
                     
                     if (showRow) {
                         row.style.display = '';
                         visibleCount++;
-                        debugInfo.matchedRows++;
-                        if (actionFilter === 'logout') {
-                            debugInfo.filteredActions.push({
-                                action: rowAction,
-                                user: rowUser,
-                                reason: matchReason.join(', ')
-                            });
-                        }
                     } else {
                         row.style.display = 'none';
                     }
@@ -456,8 +454,14 @@ if (isset($_GET['test'])) {
                 // Update the display count
                 updateActivityCount(visibleCount);
                 
-                // Update debug info
-                updateDebugInfo(debugInfo);
+                // Show available activity types in console for debugging
+                if (actionFilter === 'all') {
+                    const allActions = new Set();
+                    activityRows.forEach(row => {
+                        allActions.add(row.getAttribute('data-action'));
+                    });
+                    console.log('Available activity types in database:', Array.from(allActions));
+                }
             }
             
             function updateActivityCount(count) {
@@ -473,25 +477,6 @@ if (isset($_GET['test'])) {
                 }
             }
             
-            function updateDebugInfo(info) {
-                const debugContent = document.getElementById('debugContent');
-                if (debugContent) {
-                    debugContent.innerHTML = `
-                        <strong>Filter Info:</strong><br>
-                        Total Rows: ${info.totalRows}<br>
-                        Matched Rows: ${info.matchedRows}<br>
-                        Action Filter: ${info.actionFilter}<br>
-                        Date Filter: ${info.dateFilter || 'none'}<br>
-                        Search Filter: ${info.searchFilter || 'none'}<br>
-                        <br>
-                        <strong>Available Activity Types:</strong><br>
-                        ${Array.from(info.activityTypes).join(', ')}<br>
-                        ${info.filteredActions.length > 0 ? '<br><strong>Logout Matches:</strong><br>' + 
-                          info.filteredActions.map(a => `${a.user}: ${a.action} (${a.reason})`).join('<br>') : ''}
-                    `;
-                }
-            }
-            
             // Add event listeners
             if (activityFilter) {
                 activityFilter.addEventListener('change', filterActivities);
@@ -504,9 +489,6 @@ if (isset($_GET['test'])) {
             if (searchFilter) {
                 searchFilter.addEventListener('input', filterActivities);
             }
-            
-            // Initial filter to populate debug info
-            filterActivities();
         });
         
         function clearFilters() {
@@ -525,20 +507,10 @@ if (isset($_GET['test'])) {
             if (countElement) {
                 countElement.textContent = 'Showing last 50 activities';
             }
-            
-            // Trigger filter to update debug info
-            const event = new Event('change');
-            document.getElementById('activityFilter').dispatchEvent(event);
         }
         
         function refreshActivityLog() {
             location.reload();
-        }
-        
-        function toggleDebug() {
-            const debugInfo = document.getElementById('debugInfo');
-            debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 
-                                      debugInfo.style.display === 'block' ? 'none' : 'block';
         }
         
         function exportActivityLog() {
