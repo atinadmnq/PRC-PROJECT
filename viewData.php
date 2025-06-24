@@ -225,9 +225,6 @@ try {
 }
 ?>
 
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -319,13 +316,13 @@ try {
             </div>
             </form>
 
-        <form method="post" action="export_rorData.php" id="exportForm" style="display:none;">
+       <form method="post" action="export_rtsData.php" id="exportForm" style="display:none;">
         <input type="hidden" name="exam" id="exportExam">
         <input type="hidden" name="search_name" id="exportSearch">
         </form>
         </div>
 
-        <div class="d-flex justify-content-end mb-2">
+         <div class="d-flex justify-content-end mb-2">
         <label class="me-2">Show 
         <select id="rowsPerPageSelect" class="form-select d-inline-block w-auto">
             <option value="20" selected>20</option>
@@ -371,11 +368,8 @@ try {
                     <form id="bulkForm" method="post" action="">
                         <div class="table-responsive">
                             <table class="table table-hover mb-0">
-
                                 <thead class="table-light">
                                     <tr>
-                                        <tr class="paginated-row"> 
-
                                         <th width="50"><input type="checkbox" id="selectAllTable" class="form-check-input"></th>
                                         <th><i class="fas fa-hashtag me-1"></i>ID</th>
                                         <th><i class="fas fa-user me-1"></i>Name</th>
@@ -384,7 +378,6 @@ try {
                                         <th><i class="fas fa-upload me-1"></i>Upload Timestamp</th>
                                         <th><i class="fas fa-info-circle me-1"></i>Status</th>
                                         <th><i class="fas fa-cog me-1"></i>Action</th>
-
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -475,9 +468,6 @@ try {
             </div>
         </div>
     </div>
-
-    
-
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -666,7 +656,8 @@ try {
         document.getElementById('exportForm').submit();
         }
 
-        //Pagination
+        
+         //Pagination
 
        document.addEventListener('DOMContentLoaded', function () {
     // Get table body rows (excluding header)
@@ -788,7 +779,6 @@ try {
     observer.observe(tableBody, { childList: true });
 });
 
-        
     </script>
 </body>
 </html>

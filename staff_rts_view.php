@@ -33,44 +33,61 @@ if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
     }
 }
 
-// Handle individual release
+// Enhanced "Release" (Delete) action with proper logging
 if (isset($_POST['release_id'])) {
     $release_id = intval($_POST['release_id']);
-
+    $examinee_name = $_POST['examinee_name'] ?? 'Unknown Examinee';
+    $examination = $_POST['examination'] ?? 'Unknown Examination';
+    
     try {
         $stmt = $pdo->prepare("SELECT name, examination, exam_date, status, upload_timestamp FROM rts_data_onhold WHERE id = ?");
         $stmt->execute([$release_id]);
-        $record = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($record) {
+        $examinee_data = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($examinee_data) {
+            $examinee_name = $examinee_data['name'];
+            $examination = $examinee_data['examination'];
+            
             $stmt = $pdo->prepare("DELETE FROM rts_data_onhold WHERE id = ?");
+            
             if ($stmt->execute([$release_id])) {
-                $description = "Released RTS record: Name = {$record['name']}, Exam = {$record['examination']}, Date = {$record['exam_date']}, Status = {$record['status']}, Uploaded = {$record['upload_timestamp']}";
-                logActivity(
+                logReleaseActivity(
                     $pdo,
                     $_SESSION['user_id'] ?? null,
                     $_SESSION['full_name'] ?? $accountName,
-                    'Release RTS',
-                    $description,
-                    $record['name'],
-                    '',
-                    $release_id
+                    $examinee_name,
+                    'individual',
+                    "Released RTS record: Name = {$examinee_data['name']}, Exam = {$examinee_data['examination']}, Date = {$examinee_data['exam_date']}, Status = {$examinee_data['status']}, Uploaded = {$examinee_data['upload_timestamp']}"
                 );
-
-                $_SESSION['release_message'] = "Results successfully released for {$record['name']}";
+                
+                $_SESSION['release_message'] = "Results successfully released for {$examinee_name}";
                 $_SESSION['release_status'] = 'success';
+                
+                header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
+                exit;
             } else {
                 logActivity(
                     $pdo,
                     $_SESSION['user_id'] ?? null,
                     $_SESSION['full_name'] ?? $accountName,
                     'release_failed',
-                    "Failed to release RTS record for {$record['name']} - Release ID: {$release_id} - Database Error"
+                    "Failed to release results for {$examinee_name} - Release ID: {$release_id} - Database Error"
                 );
-
-                $_SESSION['release_message'] = "Error releasing record for {$record['name']}";
+                
+                $_SESSION['release_message'] = "Error releasing record for {$examinee_name}";
                 $_SESSION['release_status'] = 'error';
             }
+        } else {
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'] ?? null,
+                $_SESSION['full_name'] ?? $accountName,
+                'release_failed',
+                "Release ID: {$release_id} not found"
+            );
+
+            $_SESSION['release_message'] = "Record not found for release.";
+            $_SESSION['release_status'] = 'error';
         }
     } catch (Exception $e) {
         logActivity(
@@ -78,15 +95,84 @@ if (isset($_POST['release_id'])) {
             $_SESSION['user_id'] ?? null,
             $_SESSION['full_name'] ?? $accountName,
             'release_exception',
-            "Exception during RTS release for Release ID: {$release_id} - Error: " . $e->getMessage()
+            "Exception during release for {$examinee_name} - Release ID: {$release_id} - Error: " . $e->getMessage()
         );
-
+        
         $_SESSION['release_message'] = "Release failed due to an error: " . $e->getMessage();
         $_SESSION['release_status'] = 'error';
     }
+}
 
-    header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
-    exit();
+// Handle bulk release action
+if (isset($_POST['bulk_release'])) {
+    $selected_ids = $_POST['selected_records'] ?? [];
+    
+    if (!empty($selected_ids)) {
+        $success_count = 0;
+        $failed_count = 0;
+        
+        try {
+            $pdo->beginTransaction();
+            
+            foreach ($selected_ids as $id) {
+                $id = intval($id);
+                
+                $stmt = $pdo->prepare("SELECT name, examination, exam_date, status, upload_timestamp FROM rts_data_onhold WHERE id = ?");
+                $stmt->execute([$id]);
+                $examinee_data = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($examinee_data) {
+                    $delete_stmt = $pdo->prepare("DELETE FROM rts_data_onhold WHERE id = ?");
+                    if ($delete_stmt->execute([$id])) {
+                        $success_count++;
+                        
+                        logReleaseActivity(
+                            $pdo,
+                            $_SESSION['user_id'] ?? null,
+                            $_SESSION['full_name'] ?? $accountName,
+                            $examinee_data['name'],
+                            'bulk',
+                            "Released RTS record: Name = {$examinee_data['name']}, Exam = {$examinee_data['examination']}, Date = {$examinee_data['exam_date']}, Status = {$examinee_data['status']}, Uploaded = {$examinee_data['upload_timestamp']}"
+                        );
+                    } else {
+                        $failed_count++;
+                    }
+                } else {
+                    $failed_count++;
+                }
+            }
+            
+            $pdo->commit();
+            
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'] ?? null,
+                $_SESSION['full_name'] ?? $accountName,
+                'bulk_release_summary',
+                "Bulk release completed - Success: {$success_count}, Failed: {$failed_count}"
+            );
+            
+            $_SESSION['release_message'] = "Bulk release completed: {$success_count} successful, {$failed_count} failed";
+            $_SESSION['release_status'] = $failed_count > 0 ? 'warning' : 'success';
+            
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'] ?? null,
+                $_SESSION['full_name'] ?? $accountName,
+                'bulk_release_failed',
+                "Bulk release failed - Error: " . $e->getMessage()
+            );
+            
+            $_SESSION['release_message'] = "Bulk release failed: " . $e->getMessage();
+            $_SESSION['release_status'] = 'error';
+        }
+        
+        header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
+        exit();
+    }
 }
 
 // Fetch examination list
@@ -128,11 +214,6 @@ if ($exam !== '') {
     $stmt->execute($params);
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-?>
-
-
-
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -450,6 +531,18 @@ if ($exam !== '') {
             <p class="text-muted">Manage and review uploaded RTS examination data</p>
         </div>
 
+            <!-- Status Messages -->
+            <?php if (isset($_SESSION['release_message'])): ?>
+                <div class="alert alert-<?= $_SESSION['release_status'] === 'success' ? 'success' : ($_SESSION['release_status'] === 'warning' ? 'warning' : 'danger') ?> alert-dismissible fade show">
+                    <i class="fas fa-<?= $_SESSION['release_status'] === 'success' ? 'check-circle' : ($_SESSION['release_status'] === 'warning' ? 'exclamation-triangle' : 'exclamation-circle') ?> me-2"></i>
+                    <?= htmlspecialchars($_SESSION['release_message']) ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php 
+                unset($_SESSION['release_message']); 
+                unset($_SESSION['release_status']); 
+                ?>
+            <?php endif; ?>
         
 
         <!-- Filter Card -->
