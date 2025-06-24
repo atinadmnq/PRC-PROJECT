@@ -13,6 +13,10 @@ function normalizeExamination($input) {
     $mapping = [
         'aeronautical engineers' => 'AERONAUTICAL ENGINEER',
         'aeronautical engineer' => 'AERONAUTICAL ENGINEER',
+        'agriculture' => 'AGRICULTURIST',
+        'agriculturists' => 'AGRICULTURIST',
+        'agriculturist' => 'AGRICULTURIST',
+        'argiculturist' => 'AGRICULTURIST',
         'agricultural & biosystems engineers' => 'AGRICULTURAL AND BIOSYSTEMS ENGINEER',
         'architects' => 'ARCHITECT',
         'architect' => 'ARCHITECT',
