@@ -1,6 +1,7 @@
 <!-- staff_viewData.php -->
 <?php
 session_start();
+require_once 'activity_logger.php';
 
 // Database connection
 define('DB_HOST', 'localhost');
@@ -21,6 +22,8 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     exit();
 }
 
+$accountName = $_SESSION['account_name'] ?? $_SESSION['email'] ?? $_SESSION['full_name'] ?? 'Unknown User';
+
 // Get user's full name if not already set
 if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
     $stmt = $pdo->prepare("SELECT full_name FROM users WHERE id = ?");
@@ -29,106 +32,197 @@ if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
     if ($user) $_SESSION['full_name'] = $user['full_name'];
 }
 
-// Include or define the logActivity function
-function logActivity($username, $action, $details = '') {
-    global $pdo;
-    try {
-        $stmt = $pdo->prepare("INSERT INTO activity_log (username, action, details, timestamp) VALUES (?, ?, ?, NOW())");
-        $stmt->execute([$username, $action, $details]);
-    } catch (PDOException $e) {
-        error_log("Activity logging failed: " . $e->getMessage());
-    }
-}
-
-// Log the RTS table view access
-logActivity($_SESSION['account_name'] ?? $_SESSION['email'], 'rts_table_view_access', 'Staff accessed RTS table view');
-
-// Fixed activity logs query - matching staff_dashboard.php
-try {
-    $activity_logs = $pdo->query("
-        SELECT 
-            al.*,
-            COALESCE(al.user_name, al.account_name, 'Unknown User') as full_name
-        FROM activity_log al 
-        ORDER BY al.created_at DESC 
-        LIMIT 50
-    ")->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    try {
-        $activity_logs = $pdo->query("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 50")->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($activity_logs as &$log) {
-            if (!isset($log['full_name'])) {
-                $log['full_name'] = $log['user_name'] ?? $log['account_name'] ?? 'Unknown User';
-            }
-        }
-    } catch (PDOException $e2) {
-        $activity_logs = [];
-        error_log("Activity log query failed: " . $e2->getMessage());
-    }
-}
-
-// Handle "Release" (Delete) action
+// Enhanced "Release" (Delete) action with proper logging
 if (isset($_POST['release_id'])) {
     $release_id = intval($_POST['release_id']);
+    $examinee_name = $_POST['examinee_name'] ?? 'Unknown Examinee';
+    $examination = $_POST['examination'] ?? 'Unknown Examination';
     
-    $stmt = $pdo->prepare("DELETE FROM roravailable WHERE id = ?");
-    
-    if ($stmt->execute([$release_id])) {
-        // Optional: add a message or redirect after successful delete
-        header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
-        exit;
-    } else {
-        echo "Error releasing record: " . $stmt->errorInfo()[2];
+    try {
+        $stmt = $pdo->prepare("SELECT name, examination, exam_date, status, upload_timestamp FROM roravailable WHERE id = ?");
+        $stmt->execute([$release_id]);
+        $examinee_data = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($examinee_data) {
+            $examinee_name = $examinee_data['name'];
+            $examination = $examinee_data['examination'];
+            
+            $stmt = $pdo->prepare("DELETE FROM roravailable WHERE id = ?");
+            
+            if ($stmt->execute([$release_id])) {
+                logReleaseActivity(
+                    $pdo,
+                    $_SESSION['user_id'] ?? null,
+                    $_SESSION['full_name'] ?? $accountName,
+                    $examinee_name,
+                    'individual',
+                    "Released ROR record: Name = {$examinee_data['name']}, Exam = {$examinee_data['examination']}, Date = {$examinee_data['exam_date']}, Status = {$examinee_data['status']}, Uploaded = {$examinee_data['upload_timestamp']}"
+                );
+                
+                $_SESSION['release_message'] = "Results successfully released for {$examinee_name}";
+                $_SESSION['release_status'] = 'success';
+                
+                header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
+                exit;
+            } else {
+                logActivity(
+                    $pdo,
+                    $_SESSION['user_id'] ?? null,
+                    $_SESSION['full_name'] ?? $accountName,
+                    'release_failed',
+                    "Failed to release results for {$examinee_name} - Release ID: {$release_id} - Database Error"
+                );
+                
+                $_SESSION['release_message'] = "Error releasing record for {$examinee_name}";
+                $_SESSION['release_status'] = 'error';
+            }
+        } else {
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'] ?? null,
+                $_SESSION['full_name'] ?? $accountName,
+                'release_failed',
+                "Release ID: {$release_id} not found"
+            );
+
+            $_SESSION['release_message'] = "Record not found for release.";
+            $_SESSION['release_status'] = 'error';
+        }
+    } catch (Exception $e) {
+        logActivity(
+            $pdo,
+            $_SESSION['user_id'] ?? null,
+            $_SESSION['full_name'] ?? $accountName,
+            'release_exception',
+            "Exception during release for {$examinee_name} - Release ID: {$release_id} - Error: " . $e->getMessage()
+        );
+        
+        $_SESSION['release_message'] = "Release failed due to an error: " . $e->getMessage();
+        $_SESSION['release_status'] = 'error';
     }
 }
 
-// Get all distinct examinations
+// Handle bulk release action
+if (isset($_POST['bulk_release'])) {
+    $selected_ids = $_POST['selected_records'] ?? [];
+    
+    if (!empty($selected_ids)) {
+        $success_count = 0;
+        $failed_count = 0;
+        
+        try {
+            $pdo->beginTransaction();
+            
+            foreach ($selected_ids as $id) {
+                $id = intval($id);
+                
+                $stmt = $pdo->prepare("SELECT name, examination, exam_date, status, upload_timestamp FROM roravailable WHERE id = ?");
+                $stmt->execute([$id]);
+                $examinee_data = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($examinee_data) {
+                    $delete_stmt = $pdo->prepare("DELETE FROM roravailable WHERE id = ?");
+                    if ($delete_stmt->execute([$id])) {
+                        $success_count++;
+                        
+                        logReleaseActivity(
+                            $pdo,
+                            $_SESSION['user_id'] ?? null,
+                            $_SESSION['full_name'] ?? $accountName,
+                            $examinee_data['name'],
+                            'bulk',
+                            "Released ROR record: Name = {$examinee_data['name']}, Exam = {$examinee_data['examination']}, Date = {$examinee_data['exam_date']}, Status = {$examinee_data['status']}, Uploaded = {$examinee_data['upload_timestamp']}"
+                        );
+                    } else {
+                        $failed_count++;
+                    }
+                } else {
+                    $failed_count++;
+                }
+            }
+            
+            $pdo->commit();
+            
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'] ?? null,
+                $_SESSION['full_name'] ?? $accountName,
+                'bulk_release_summary',
+                "Bulk release completed - Success: {$success_count}, Failed: {$failed_count}"
+            );
+            
+            $_SESSION['release_message'] = "Bulk release completed: {$success_count} successful, {$failed_count} failed";
+            $_SESSION['release_status'] = $failed_count > 0 ? 'warning' : 'success';
+            
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'] ?? null,
+                $_SESSION['full_name'] ?? $accountName,
+                'bulk_release_failed',
+                "Bulk release failed - Error: " . $e->getMessage()
+            );
+            
+            $_SESSION['release_message'] = "Bulk release failed: " . $e->getMessage();
+            $_SESSION['release_status'] = 'error';
+        }
+        
+        header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
+        exit();
+    }
+}
+
+// Fetch examination list
 $sql = "SELECT DISTINCT examination FROM roravailable ORDER BY upload_timestamp DESC";
 $result = $pdo->query($sql);
+$examinations = $result ? $result->fetchAll(PDO::FETCH_COLUMN) : [];
 
-$examinations = [];
-if ($result) {
-    while ($row = $result->fetch(PDO::FETCH_ASSOC)) {
-        $examinations[] = $row['examination'];
-    }
-}
-
-// Get count per examination
+// Fetch examination counts
 $sql_counts = "SELECT examination, COUNT(*) as count FROM roravailable GROUP BY examination";
 $result_counts = $pdo->query($sql_counts);
-
 $exam_counts = [];
 $total_count = 0;
-
 if ($result_counts) {
-    while ($row = $result_counts->fetch(PDO::FETCH_ASSOC)) {
+    foreach ($result_counts->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $exam_counts[$row['examination']] = $row['count'];
         $total_count += $row['count'];
     }
 }
 
-// Read GET parameters safely
+// Fetch data based on filter
 $exam = isset($_GET['examination']) ? trim($_GET['examination']) : '';
 $search_name = isset($_GET['search_name']) ? trim($_GET['search_name']) : '';
-
-// If examination selected, fetch its data with optional name filter
 $data = [];
 if ($exam !== '') {
     $sql_data = "SELECT id, name, examination, exam_date, upload_timestamp, status 
                  FROM roravailable 
                  WHERE LOWER(examination) = LOWER(?)";
     $params = [$exam];
-
     if ($search_name !== '') {
         $sql_data .= " AND name LIKE ?";
-        $params[] = '%' . $search_name . '%';
+        $params[] = "%$search_name%";
     }
-
     $sql_data .= " ORDER BY upload_timestamp DESC";
-
     $stmt = $pdo->prepare($sql_data);
     $stmt->execute($params);
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Fetch activity logs
+try {
+    $activity_logs = $pdo->query("
+        SELECT 
+            al.*,
+            COALESCE(al.user_name, al.account_name, al.username, 'Unknown User') as full_name
+        FROM activity_log al 
+        ORDER BY COALESCE(al.created_at, al.timestamp) DESC 
+        LIMIT 50
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $activity_logs = [];
+    error_log("Activity log query failed: " . $e->getMessage());
 }
 ?>
 
@@ -142,7 +236,7 @@ if ($exam !== '') {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body {
+         body {
             background: #f8f9fa;
             font-family: "Century Gothic";
             margin: 0;
@@ -367,10 +461,13 @@ if ($exam !== '') {
             background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
             transform: translateY(-1px);
         }
-    </style>
+        </style>
+
+   
 </head>
 <body>
    <?php include 'staff_panel.php'; ?>
+
     <!-- Right Side Panel for Summary -->
     <div class="right-panel">
         <h5 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Summary of Uploaded Data</h5>
@@ -389,15 +486,27 @@ if ($exam !== '') {
         <?php endforeach; ?>
     </div>
     
-    <div class="main-content">
-        <!-- ROR Data Section -->
+   <div class="main-content">
+        <!-- Main ROR Data View Section -->
         <div id="ror-data" class="content-section active">
             <div class="page-header">
                 <h1 class="page-title"><i class="fas fa-table me-3"></i>View Uploaded ROR Data</h1>
                 <p class="text-muted">Report of Rating Issuance Logistics and Inventory System</p>
             </div>
 
-            <!-- Updated Filter Card (copied from RTS view) -->
+            <!-- Status Messages -->
+            <?php if (isset($_SESSION['release_message'])): ?>
+                <div class="alert alert-<?= $_SESSION['release_status'] === 'success' ? 'success' : ($_SESSION['release_status'] === 'warning' ? 'warning' : 'danger') ?> alert-dismissible fade show">
+                    <i class="fas fa-<?= $_SESSION['release_status'] === 'success' ? 'check-circle' : ($_SESSION['release_status'] === 'warning' ? 'exclamation-triangle' : 'exclamation-circle') ?> me-2"></i>
+                    <?= htmlspecialchars($_SESSION['release_message']) ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                <?php 
+                unset($_SESSION['release_message']); 
+                unset($_SESSION['release_status']); 
+                ?>
+            <?php endif; ?>
+            <!-- Filter Card  -->
             <div class="filter-card">
                 <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
                 <form method="get" action="" id="filterForm">
@@ -420,19 +529,25 @@ if ($exam !== '') {
                         <div class="col-md-4">
                             <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-2"></i>Search</button>
                         </div>
-                    </div>
+                        
                 </form>
             </div>
             
-            <div class="d-flex justify-content-end mb-2">
-            <label class="me-2">Show 
-            <select id="rowsPerPageSelect" class="form-select d-inline-block w-auto">
+             <form method="post" action="export_rtsData.php" id="exportForm" style="display:none;">
+        <input type="hidden" name="exam" id="exportExam">
+        <input type="hidden" name="search_name" id="exportSearch">
+        </form>
+        </div>
+
+         <div class="d-flex justify-content-end mb-2">
+        <label class="me-2">Show 
+        <select id="rowsPerPageSelect" class="form-select d-inline-block w-auto">
             <option value="20" selected>20</option>
             <option value="50">50</option>
             <option value="100">100</option>
-            </select> entries
-            </label>
-            </div>
+        </select> entries
+        </label>
+        </div>
 
             <!-- Data Table Card -->
             <?php if (!empty($data)): ?>
@@ -777,6 +892,127 @@ if ($exam !== '') {
     observer.observe(tableBody, { childList: true });
 });
     
+     //Pagination
+
+       document.addEventListener('DOMContentLoaded', function () {
+    // Get table body rows (excluding header)
+    const tableBody = document.querySelector('tbody');
+    if (!tableBody) return; // Exit if no table body found
+    
+    const rows = tableBody.querySelectorAll('tr');
+    const rowsPerPageSelect = document.getElementById('rowsPerPageSelect');
+    
+    // Create pagination controls if they don't exist
+    let paginationContainer = document.getElementById('paginationContainer');
+    if (!paginationContainer) {
+        // Create pagination container
+        paginationContainer = document.createElement('div');
+        paginationContainer.id = 'paginationContainer';
+        paginationContainer.className = 'd-flex justify-content-between align-items-center mt-3';
+        paginationContainer.innerHTML = `
+            <div id="pageInfo" class="text-muted">Page 1 of 1</div>
+            <div id="paginationControls" class="d-flex align-items-center gap-2">
+                <button id="prevPage" class="btn btn-outline-secondary btn-sm" disabled>
+                    <i class="fas fa-chevron-left"></i> Previous
+                </button>
+                <button id="nextPage" class="btn btn-outline-secondary btn-sm">
+                    Next <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        `;
+        
+        // Insert pagination container after the table card
+        const tableCard = document.querySelector('.table-responsive').closest('.card');
+        if (tableCard) {
+            tableCard.parentNode.insertBefore(paginationContainer, tableCard.nextSibling);
+        }
+    }
+    
+    const pageInfo = document.getElementById('pageInfo');
+    const prevBtn = document.getElementById('prevPage');
+    const nextBtn = document.getElementById('nextPage');
+    
+    let currentPage = 1;
+    let rowsPerPage = parseInt(rowsPerPageSelect.value);
+    let totalPages = Math.ceil(rows.length / rowsPerPage);
+
+    function showPage(page) {
+        const start = (page - 1) * rowsPerPage;
+        const end = start + rowsPerPage;
+
+        rows.forEach((row, index) => {
+            if (index >= start && index < end) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        totalPages = Math.ceil(rows.length / rowsPerPage);
+        
+        // Update page info
+        if (pageInfo) {
+            if (rows.length === 0) {
+                pageInfo.textContent = 'No records to display';
+            } else {
+                const displayStart = start + 1;
+                const displayEnd = Math.min(end, rows.length);
+                pageInfo.textContent = `Showing ${displayStart}-${displayEnd} of ${rows.length} entries`;
+            }
+        }
+        
+        // Update button states
+        if (prevBtn) prevBtn.disabled = page === 1;
+        if (nextBtn) nextBtn.disabled = page === totalPages || rows.length === 0;
+    }
+
+    // Event listeners
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                showPage(currentPage);
+            }
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                showPage(currentPage);
+            }
+        });
+    }
+
+    if (rowsPerPageSelect) {
+        rowsPerPageSelect.addEventListener('change', () => {
+            rowsPerPage = parseInt(rowsPerPageSelect.value);
+            currentPage = 1; // Reset to first page
+            totalPages = Math.ceil(rows.length / rowsPerPage);
+            showPage(currentPage);
+        });
+    }
+
+    // Initial setup
+    if (rows.length > 0) {
+        showPage(currentPage);
+        if (paginationContainer) paginationContainer.style.display = 'flex';
+    } else {
+        if (paginationContainer) paginationContainer.style.display = 'none';
+    }
+
+    // Update pagination when filters change (for dynamic content)
+    const observer = new MutationObserver(() => {
+        const newRows = tableBody.querySelectorAll('tr');
+        if (newRows.length !== rows.length) {
+            // Rows have changed, reinitialize
+            location.reload(); // Simple approach, or you could update the rows variable
+        }
+    });
+
+    observer.observe(tableBody, { childList: true });
+});
     </script>
 </body>
 </html>

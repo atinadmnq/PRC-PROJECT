@@ -414,14 +414,12 @@ if ($exam !== '') {
                                                 </span>
                                             </td>
                                             <td>
-                                                <form method="post" action="" onsubmit="return confirmRelease('<?= htmlspecialchars($row['name']) ?>');" class="d-inline">
-                                                    <input type="hidden" name="release_id" value="<?= htmlspecialchars($row['id']) ?>">
-                                                    <input type="hidden" name="examinee_name" value="<?= htmlspecialchars($row['name']) ?>">
-                                                    <input type="hidden" name="examination" value="<?= htmlspecialchars($row['examination']) ?>">
-                                                    <button type="submit" class="btn btn-danger btn-sm">
-                                                        <i class="fas fa-trash me-1"></i>Release
-                                                    </button>
-                                                </form>
+                                                <form method="post" action="" onsubmit="return confirm('Are you sure you want to release (delete) this record?');" class="d-inline">
+                                                <input type="hidden" name="release_id" value="<?= htmlspecialchars($row['id']) ?>">
+                                                <button type="submit" class="btn btn-danger btn-sm">
+                                                    <i class="fas fa-trash me-1"></i>Release
+                                                </button>
+                                            </form>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -442,36 +440,7 @@ if ($exam !== '') {
         <?php endif; ?>
     </div>
 
-    <!-- Confirmation Modal -->
-    <div class="modal fade" id="confirmReleaseModal" tabindex="-1" aria-labelledby="confirmReleaseModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="confirmReleaseModalLabel">
-                        <i class="fas fa-exclamation-triangle text-warning me-2"></i>Confirm Release
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="mb-3">Are you sure you want to release the following record(s)?</p>
-                    <div id="releaseConfirmationContent"></div>
-                    <div class="alert alert-warning mt-3">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <strong>Note:</strong> This action will permanently delete the record(s) from the system and cannot be undone.
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="fas fa-times me-2"></i>Cancel
-                    </button>
-                    <button type="button" class="btn btn-danger" id="confirmReleaseBtn">
-                        <i class="fas fa-trash me-2"></i>Confirm Release
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
+   
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Navigation functionality
