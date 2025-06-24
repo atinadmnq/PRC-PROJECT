@@ -7,6 +7,7 @@ require 'vendor/autoload.php';
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 
+
 function normalizeExamination($input) {
     $input = strtolower(trim($input));
     $mapping = [
