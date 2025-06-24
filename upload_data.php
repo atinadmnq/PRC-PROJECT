@@ -6,7 +6,7 @@ require 'vendor/autoload.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
-// Normalize examination titles
+
 function normalizeExamination($input) {
     $input = strtolower(trim($input));
 
