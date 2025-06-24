@@ -16,7 +16,7 @@ function normalizeExamination($input) {
         'agriculture' => 'AGRICULTURIST',
         'agriculturists' => 'AGRICULTURIST',
         'agriculturist' => 'AGRICULTURIST',
-        'argiculturist' => 'AGRICULTURIST',
+        'agiculturist' => 'AGRICULTURIST',
         'agricultural & biosystems engineers' => 'AGRICULTURAL AND BIOSYSTEMS ENGINEER',
         'architects' => 'ARCHITECT',
         'architect' => 'ARCHITECT',
