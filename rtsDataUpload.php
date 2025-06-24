@@ -6,15 +6,19 @@ require 'vendor/autoload.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
-
 function normalizeExamination($input) {
     $input = strtolower(trim($input));
     $mapping = [
         'aeronautical engineers' => 'AERONAUTICAL ENGINEER',
         'aeronautical engineer' => 'AERONAUTICAL ENGINEER',
+        'agriculture' => 'AGRICULTURIST',
+        'agriculturists' => 'AGRICULTURIST',
+        'agriculturist' => 'AGRICULTURIST',
+        'argriculturist' => 'AGRICULTURIST',
         'agricultural & biosystems engineers' => 'AGRICULTURAL AND BIOSYSTEMS ENGINEER',
         'architects' => 'ARCHITECT',
         'architect' => 'ARCHITECT',
+        'arch'=> 'ARCHITECT',
         'certified plant mechanics' => 'CERTIFIED PLANT MECHANIC',
         'certified plant mechanic' => 'CERTIFIED PLANT MECHANIC',
         'certified public accountants' => 'CERTIFIED PUBLIC ACCOUNTANT',
