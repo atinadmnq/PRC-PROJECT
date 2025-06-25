@@ -9,18 +9,18 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 
 try {
-    $pdo = new PDO("mysql:host=".DB_HOST.";dbname=".DB_NAME, DB_USER, DB_PASS);
+    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch (PDOException $e) {
     die("Database connection failed: " . $e->getMessage());
 }
 
-// Check if user is logged in as staff
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     header("Location: index.php");
     exit();
 }
 
+// Get account name
 $accountName = $_SESSION['account_name'] ?? $_SESSION['email'] ?? $_SESSION['full_name'] ?? 'Unknown User';
 
 // Get user's full name if not already set
@@ -28,7 +28,9 @@ if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
     $stmt = $pdo->prepare("SELECT full_name FROM users WHERE id = ?");
     $stmt->execute([$_SESSION['user_id']]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($user) $_SESSION['full_name'] = $user['full_name'];
+    if ($user) {
+        $_SESSION['full_name'] = $user['full_name'];
+    }
 }
 
 // Enhanced "Release" (Delete) action with proper logging
@@ -190,38 +192,27 @@ if ($result_counts) {
     }
 }
 
-// Fetch data based on filter
+// Fetch data based on filters
 $exam = isset($_GET['examination']) ? trim($_GET['examination']) : '';
 $search_name = isset($_GET['search_name']) ? trim($_GET['search_name']) : '';
 $data = [];
+
 if ($exam !== '') {
     $sql_data = "SELECT id, name, examination, exam_date, upload_timestamp, status 
-                 FROM roravailable 
+                 FROM roravailable
                  WHERE LOWER(examination) = LOWER(?)";
     $params = [$exam];
+
     if ($search_name !== '') {
         $sql_data .= " AND name LIKE ?";
         $params[] = "%$search_name%";
     }
+
     $sql_data .= " ORDER BY upload_timestamp DESC";
+
     $stmt = $pdo->prepare($sql_data);
     $stmt->execute($params);
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
-
-// Fetch activity logs
-try {
-    $activity_logs = $pdo->query("
-        SELECT 
-            al.*,
-            COALESCE(al.user_name, al.account_name, al.username, 'Unknown User') as full_name
-        FROM activity_log al 
-        ORDER BY COALESCE(al.created_at, al.timestamp) DESC 
-        LIMIT 50
-    ")->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $activity_logs = [];
-    error_log("Activity log query failed: " . $e->getMessage());
 }
 ?>
 
@@ -316,7 +307,7 @@ try {
             </div>
             </form>
 
-       <form method="post" action="export_rtsData.php" id="exportForm" style="display:none;">
+       <form method="post" action="export_rorData.php" id="exportForm" style="display:none;">
         <input type="hidden" name="exam" id="exportExam">
         <input type="hidden" name="search_name" id="exportSearch">
         </form>
