@@ -1,13 +1,15 @@
 <?php
 session_start();
+require_once 'activity_logger.php';
 include 'db_connect.php';
-require_once 'activity_logger.php'; 
-require 'vendor/autoload.php'; 
+require 'vendor/autoload.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
+
 function normalizeExamination($input) {
     $input = strtolower(trim($input));
+
     $mapping = [
         'aeronautical engineers' => 'AERONAUTICAL ENGINEER',
         'aeronautical engineer' => 'AERONAUTICAL ENGINEER',
@@ -143,25 +145,17 @@ function normalizeExamination($input) {
         'x-ray' => 'X-RAY TECHNOLOGIST',
        
     ];
-    return $mapping[$input] ?? strtoupper($input);
-}
 
-
-// PDO connection for activity logging
-try {
-    $pdo = new PDO("mysql:host=localhost;dbname=prc_release_db", "root", "");
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die("Database connection failed: " . $e->getMessage());
+    return $mapping[$input] ?? strtoupper($input); // fallback: uppercase input
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
     $file = $_FILES["excel_file"]["tmp_name"];
-    $fileName = $_FILES["excel_file"]["name"];
+    $fileName = $_FILES["excel_file"]["name"] ?? 'Unknown File';
 
     if (!file_exists($file)) {
-        logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_rts', "Failed to upload RTS file: {$fileName} - File not found");
         $_SESSION["error"] = "File not found.";
+        logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_rts', "Failed to upload ROR file: {$fileName} - Error: File not found");
         header("Location: rts_ui.php");
         exit();
     }
@@ -174,20 +168,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         $rows = $worksheet->toArray();
 
         $recordsInserted = 0;
+        $skippedRows = 0;
         $inserted_ids = [];
 
-        // Start reading from row 4
         for ($i = 3; $i < count($rows); $i++) {
             $data = $rows[$i];
 
-            if (empty($data[0]) && empty($data[1]) && empty($data[2]) && empty($data[3])) {
+            // Skip completely empty rows
+            if (empty(trim($data[0])) && empty(trim($data[1])) && empty(trim($data[2])) && empty(trim($data[3]))) {
                 continue;
             }
 
-            $name = $data[1] ?? 'N/A';
-            $raw_exam = $data[2] ?? 'N/A';
+            $name = trim($data[1] ?? '');
+            $raw_exam = trim($data[2] ?? '');
+            $exam_date = trim($data[3] ?? '');
+
+            // Skip if any required field is blank
+            if (empty($name) || empty($raw_exam) || empty($exam_date)) {
+                $skippedRows++;
+                continue;
+            }
+
             $examination = normalizeExamination($raw_exam);
-            $exam_date = $data[3] ?? 'N/A';
             $status = 'pending';
 
             $stmt = $conn->prepare("INSERT INTO rts_data_onhold (name, examination, exam_date, upload_timestamp, status) VALUES (?, ?, ?, ?, ?)");
@@ -202,23 +204,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         }
 
         if ($recordsInserted > 0) {
-            logRTSUpload($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', $fileName, $recordsInserted);
+            logRTSUpload($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', $fileName, $recordsInserted);
             $_SESSION["message"] = "Excel file uploaded successfully! {$recordsInserted} records processed.";
+            if ($skippedRows > 0) {
+                $_SESSION["message"] .= " {$skippedRows} rows skipped due to missing data.";
+            }
             $_SESSION["last_upload_timestamp"] = $upload_timestamp;
             $_SESSION["last_upload_ids"] = $inserted_ids;
         } else {
-            logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_rts', "Failed to upload RTS file: {$fileName} - No records inserted");
             $_SESSION["error"] = "No records inserted.";
+            if ($skippedRows > 0) {
+                $_SESSION["error"] .= " All rows skipped due to missing data.";
+            }
+            logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_rts', "Failed to upload RTS file: {$fileName} - Error: No records processed");
         }
 
     } catch (Exception $e) {
-        logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_rts', "Failed to upload RTS file: {$fileName} - Error: " . $e->getMessage());
         $_SESSION["error"] = "Error reading Excel file: " . $e->getMessage();
+        logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_rts', "Failed to upload RTS file: {$fileName} - Error: " . $e->getMessage());
     }
 
 } else {
-    logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_rts', "Invalid RTS upload attempt - No file uploaded");
     $_SESSION["error"] = "No file uploaded.";
+    logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_rts', "Failed to upload RTS file - Error: No file uploaded");
 }
 
 header("Location: rts_ui.php");

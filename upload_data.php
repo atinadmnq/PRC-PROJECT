@@ -168,19 +168,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         $rows = $worksheet->toArray();
 
         $recordsInserted = 0;
+        $skippedRows = 0;
         $inserted_ids = [];
 
         for ($i = 3; $i < count($rows); $i++) {
             $data = $rows[$i];
 
-            if (empty($data[0]) && empty($data[1]) && empty($data[2]) && empty($data[3])) {
+            // Skip completely empty rows
+            if (empty(trim($data[0])) && empty(trim($data[1])) && empty(trim($data[2])) && empty(trim($data[3]))) {
                 continue;
             }
 
-            $name = $data[1] ?? 'N/A';
-            $raw_exam = $data[2] ?? 'N/A';
+            $name = trim($data[1] ?? '');
+            $raw_exam = trim($data[2] ?? '');
+            $exam_date = trim($data[3] ?? '');
+
+            // Skip if any required field is blank
+            if (empty($name) || empty($raw_exam) || empty($exam_date)) {
+                $skippedRows++;
+                continue;
+            }
+
             $examination = normalizeExamination($raw_exam);
-            $exam_date = $data[3] ?? 'N/A';
             $status = 'pending';
 
             $stmt = $conn->prepare("INSERT INTO roravailable (name, examination, exam_date, upload_timestamp, status) VALUES (?, ?, ?, ?, ?)");
@@ -197,10 +206,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         if ($recordsInserted > 0) {
             logRORUpload($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', $fileName, $recordsInserted);
             $_SESSION["message"] = "Excel file uploaded successfully! {$recordsInserted} records processed.";
+            if ($skippedRows > 0) {
+                $_SESSION["message"] .= " {$skippedRows} rows skipped due to missing data.";
+            }
             $_SESSION["last_upload_timestamp"] = $upload_timestamp;
             $_SESSION["last_upload_ids"] = $inserted_ids;
         } else {
             $_SESSION["error"] = "No records inserted.";
+            if ($skippedRows > 0) {
+                $_SESSION["error"] .= " All rows skipped due to missing data.";
+            }
             logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - Error: No records processed");
         }
 
