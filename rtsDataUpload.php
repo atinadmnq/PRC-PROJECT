@@ -171,7 +171,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         $skippedRows = 0;
         $inserted_ids = [];
 
-        for ($i = 3; $i < count($rows); $i++) {
+        
+        for ($i = 2; $i < count($rows); $i++) {
             $data = $rows[$i];
 
             // Skip completely empty rows

@@ -149,13 +149,21 @@ function normalizeExamination($input) {
     return $mapping[$input] ?? strtoupper($input); // fallback: uppercase input
 }
 
+// PDO connection for activity logging
+try {
+    $pdo = new PDO("mysql:host=localhost;dbname=prc_release_db", "root", "");
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
     $file = $_FILES["excel_file"]["tmp_name"];
-    $fileName = $_FILES["excel_file"]["name"] ?? 'Unknown File';
+    $fileName = $_FILES["excel_file"]["name"];
 
     if (!file_exists($file)) {
+        logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - File not found");
         $_SESSION["error"] = "File not found.";
-        logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - Error: File not found");
         header("Location: uploadData_ui.php");
         exit();
     }
@@ -174,22 +182,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         for ($i = 3; $i < count($rows); $i++) {
             $data = $rows[$i];
 
-            // Skip completely empty rows
-            if (empty(trim($data[0])) && empty(trim($data[1])) && empty(trim($data[2])) && empty(trim($data[3]))) {
+            // Skip rows where all required fields are empty or whitespace
+            if (
+                (!isset($data[1]) || trim($data[1]) === '') &&
+                (!isset($data[2]) || trim($data[2]) === '') &&
+                (!isset($data[3]) || trim($data[3]) === '')
+            ) {
                 continue;
             }
 
-            $name = trim($data[1] ?? '');
-            $raw_exam = trim($data[2] ?? '');
-            $exam_date = trim($data[3] ?? '');
-
-            // Skip if any required field is blank
-            if (empty($name) || empty($raw_exam) || empty($exam_date)) {
-                $skippedRows++;
-                continue;
-            }
-
+            $name = trim($data[1]) ?? 'N/A';
+            $raw_exam = trim($data[2]) ?? 'N/A';
             $examination = normalizeExamination($raw_exam);
+            $exam_date = trim($data[3]) ?? 'N/A';
             $status = 'pending';
 
             $stmt = $conn->prepare("INSERT INTO roravailable (name, examination, exam_date, upload_timestamp, status) VALUES (?, ?, ?, ?, ?)");
@@ -204,7 +209,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         }
 
         if ($recordsInserted > 0) {
-            logRORUpload($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', $fileName, $recordsInserted);
+            logRORUpload($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', $fileName, $recordsInserted);
             $_SESSION["message"] = "Excel file uploaded successfully! {$recordsInserted} records processed.";
             if ($skippedRows > 0) {
                 $_SESSION["message"] .= " {$skippedRows} rows skipped due to missing data.";
@@ -212,21 +217,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
             $_SESSION["last_upload_timestamp"] = $upload_timestamp;
             $_SESSION["last_upload_ids"] = $inserted_ids;
         } else {
+            logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - No records inserted");
             $_SESSION["error"] = "No records inserted.";
-            if ($skippedRows > 0) {
-                $_SESSION["error"] .= " All rows skipped due to missing data.";
-            }
             logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - Error: No records processed");
         }
 
     } catch (Exception $e) {
+        logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - Error: " . $e->getMessage());
         $_SESSION["error"] = "Error reading Excel file: " . $e->getMessage();
-        logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - Error: " . $e->getMessage());
     }
 
 } else {
+    logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Invalid ROR upload attempt - No file uploaded");
     $_SESSION["error"] = "No file uploaded.";
-    logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file - Error: No file uploaded");
 }
 
 header("Location: uploadData_ui.php");
