@@ -176,8 +176,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         $recordsInserted = 0;
         $inserted_ids = [];
 
-        // Start reading from row 4
-        for ($i = 3; $i < count($rows); $i++) {
+        
+        for ($i = 2; $i < count($rows); $i++) {
             $data = $rows[$i];
 
             if (empty($data[0]) && empty($data[1]) && empty($data[2]) && empty($data[3])) {
