@@ -149,13 +149,21 @@ function normalizeExamination($input) {
     return $mapping[$input] ?? strtoupper($input); // fallback: uppercase input
 }
 
+// PDO connection for activity logging
+try {
+    $pdo = new PDO("mysql:host=localhost;dbname=prc_release_db", "root", "");
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
+}
+
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
     $file = $_FILES["excel_file"]["tmp_name"];
-    $fileName = $_FILES["excel_file"]["name"] ?? 'Unknown File';
+    $fileName = $_FILES["excel_file"]["name"];
 
     if (!file_exists($file)) {
+        logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - File not found");
         $_SESSION["error"] = "File not found.";
-        logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - Error: File not found");
         header("Location: uploadData_ui.php");
         exit();
     }
@@ -204,7 +212,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         }
 
         if ($recordsInserted > 0) {
-            logRORUpload($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', $fileName, $recordsInserted);
+            logRORUpload($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', $fileName, $recordsInserted);
             $_SESSION["message"] = "Excel file uploaded successfully! {$recordsInserted} records processed.";
             if ($skippedRows > 0) {
                 $_SESSION["message"] .= " {$skippedRows} rows skipped due to missing data.";
@@ -216,17 +224,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
             if ($skippedRows > 0) {
                 $_SESSION["error"] .= " All rows skipped due to missing data.";
             }
-            logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - Error: No records processed");
+            logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - Error: No records processed");
         }
 
     } catch (Exception $e) {
+        logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - Error: " . $e->getMessage());
         $_SESSION["error"] = "Error reading Excel file: " . $e->getMessage();
-        logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - Error: " . $e->getMessage());
     }
 
 } else {
+    logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Invalid ROR upload attempt - No file uploaded");
     $_SESSION["error"] = "No file uploaded.";
-    logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file - Error: No file uploaded");
 }
 
 header("Location: uploadData_ui.php");

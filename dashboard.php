@@ -404,69 +404,7 @@ if (!empty($recentActivities)) {
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Navigation functionality
-            const navLinks = document.querySelectorAll('.nav-link[data-section]');
-            const contentSections = document.querySelectorAll('.content-section');
-            
-            navLinks.forEach(link => {
-                link.addEventListener('click', function() {
-                    const targetSection = this.getAttribute('data-section');
-                    
-                    // Remove active class from all nav links and content sections
-                    navLinks.forEach(nav => nav.classList.remove('active'));
-                    contentSections.forEach(section => section.classList.remove('active'));
-                    
-                    // Add active class to clicked nav link and corresponding content section
-                    this.classList.add('active');
-                    document.getElementById(targetSection).classList.add('active');
-                });
-            });
-            
-            // Password validation
-            const passwordField = document.getElementById('password');
-            const passwordHelp = document.getElementById('passwordHelp');
-            
-            if (passwordField && passwordHelp) {
-                passwordField.addEventListener('input', function() {
-                    const password = this.value;
-                    const hasUpper = /[A-Z]/.test(password);
-                    const hasLower = /[a-z]/.test(password);
-                    const hasNumber = /[0-9]/.test(password);
-                    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-                    const isLongEnough = password.length >= 8;
-                    
-                    if (hasUpper && hasLower && hasNumber && hasSpecial && isLongEnough) {
-                        passwordHelp.className = 'text-success';
-                        passwordHelp.textContent = 'Strong password ✓';
-                    } else {
-                        passwordHelp.className = 'text-danger';
-                        passwordHelp.textContent = 'Must contain uppercase, lowercase, number and special character (min 8 chars)';
-                    }
-                });
-            }
-            
-            // Activity log filtering functionality
-            const activityFilter = document.getElementById('activityFilter');
-            if (activityFilter) {
-                activityFilter.addEventListener('change', function() {
-                    const filter = this.value;
-                    const activityRows = document.querySelectorAll('.activity-row');
-                    
-                    activityRows.forEach(row => {
-                        const rowAction = row.getAttribute('data-action');
-                        
-                        // Show row if filter is 'all' or matches the row's action
-                        if (filter === 'all' || rowAction === filter) {
-                            row.style.display = '';
-                        } else {
-                            row.style.display = 'none';
-                        }
-                    });
-                });
-            }
-        });
+    <script src="js/dashboard.js">
     </script>
 </body>
 </html>

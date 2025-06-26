@@ -33,6 +33,129 @@ if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
     }
 }
 
+
+// Handle bulk release action
+if (isset($_POST['bulk_release'])) {
+    $selected_ids = $_POST['selected_records'] ?? [];
+    
+    if (!empty($selected_ids)) {
+        $success_count = 0;
+        $failed_count = 0;
+        $released_names = [];
+        $examination_name = '';
+        
+        try {
+            $pdo->beginTransaction();
+            
+            foreach ($selected_ids as $id) {
+                $id = intval($id);
+                
+                $stmt = $pdo->prepare("SELECT name, examination, exam_date, status, upload_timestamp FROM rts_data_onhold WHERE id = ?");
+                $stmt->execute([$id]);
+                $examinee_data = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($examinee_data) {
+                    // Capture examination name (all should be the same in bulk release)
+                    if (empty($examination_name)) {
+                        $examination_name = $examinee_data['examination'];
+                    }
+                    
+                    $delete_stmt = $pdo->prepare("DELETE FROM rts_data_onhold WHERE id = ?");
+                    if ($delete_stmt->execute([$id])) {
+                        $success_count++;
+                        $released_names[] = $examinee_data['name'];
+                        
+                        logReleaseActivity(
+                            $pdo,
+                            $_SESSION['user_id'] ?? null,
+                            $_SESSION['full_name'] ?? $accountName,
+                            $examinee_data['name'],
+                            'bulk',
+                            "Released RTS record: Name = {$examinee_data['name']}, Exam = {$examinee_data['examination']}, Date = {$examinee_data['exam_date']}, Status = {$examinee_data['status']}, Uploaded = {$examinee_data['upload_timestamp']}"
+                        );
+                    } else {
+                        $failed_count++;
+                    }
+                } else {
+                    $failed_count++;
+                }
+            }
+            
+            $pdo->commit();
+            
+            // Use the new logBulkReleaseSummary function with examination name
+            logBulkReleaseSummary(
+                $pdo,
+                $_SESSION['user_id'] ?? null,
+                $_SESSION['full_name'] ?? $accountName,
+                $success_count,
+                $failed_count,
+                $released_names,
+                $examination_name
+            );
+            
+            $_SESSION['release_message'] = "Bulk release completed: {$success_count} successful, {$failed_count} failed";
+            $_SESSION['release_status'] = $failed_count > 0 ? 'warning' : 'success';
+            
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            
+            logActivity(
+                $pdo,
+                $_SESSION['user_id'] ?? null,
+                $_SESSION['full_name'] ?? $accountName,
+                'bulk_release_failed',
+                "Bulk release failed - Error: " . $e->getMessage()
+            );
+            
+            $_SESSION['release_message'] = "Bulk release failed: " . $e->getMessage();
+            $_SESSION['release_status'] = 'error';
+        }
+        
+        header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
+        exit();
+    }
+}
+// Fetch examination list
+$sql = "SELECT DISTINCT examination FROM rts_data_onhold ORDER BY upload_timestamp DESC";
+$result = $pdo->query($sql);
+$examinations = $result ? $result->fetchAll(PDO::FETCH_COLUMN) : [];
+
+// Fetch examination counts
+$sql_counts = "SELECT examination, COUNT(*) as count FROM rts_data_onhold GROUP BY examination";
+$result_counts = $pdo->query($sql_counts);
+$exam_counts = [];
+$total_count = 0;
+if ($result_counts) {
+    foreach ($result_counts->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $exam_counts[$row['examination']] = $row['count'];
+        $total_count += $row['count'];
+    }
+}
+
+// Fetch data based on filters
+$exam = isset($_GET['examination']) ? trim($_GET['examination']) : '';
+$search_name = isset($_GET['search_name']) ? trim($_GET['search_name']) : '';
+$data = [];
+
+if ($exam !== '') {
+    $sql_data = "SELECT id, name, examination, exam_date, upload_timestamp, status 
+                 FROM rts_data_onhold 
+                 WHERE LOWER(examination) = LOWER(?)";
+    $params = [$exam];
+
+    if ($search_name !== '') {
+        $sql_data .= " AND name LIKE ?";
+        $params[] = "%$search_name%";
+    }
+
+    $sql_data .= " ORDER BY upload_timestamp DESC";
+
+    $stmt = $pdo->prepare($sql_data);
+    $stmt->execute($params);
+    $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // Enhanced "Release" (Delete) action with proper logging
 if (isset($_POST['release_id'])) {
     $release_id = intval($_POST['release_id']);
@@ -103,117 +226,6 @@ if (isset($_POST['release_id'])) {
     }
 }
 
-// Handle bulk release action
-if (isset($_POST['bulk_release'])) {
-    $selected_ids = $_POST['selected_records'] ?? [];
-    
-    if (!empty($selected_ids)) {
-        $success_count = 0;
-        $failed_count = 0;
-        
-        try {
-            $pdo->beginTransaction();
-            
-            foreach ($selected_ids as $id) {
-                $id = intval($id);
-                
-                $stmt = $pdo->prepare("SELECT name, examination, exam_date, status, upload_timestamp FROM rts_data_onhold WHERE id = ?");
-                $stmt->execute([$id]);
-                $examinee_data = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                if ($examinee_data) {
-                    $delete_stmt = $pdo->prepare("DELETE FROM rts_data_onhold WHERE id = ?");
-                    if ($delete_stmt->execute([$id])) {
-                        $success_count++;
-                        
-                        logReleaseActivity(
-                            $pdo,
-                            $_SESSION['user_id'] ?? null,
-                            $_SESSION['full_name'] ?? $accountName,
-                            $examinee_data['name'],
-                            'bulk',
-                            "Released RTS record: Name = {$examinee_data['name']}, Exam = {$examinee_data['examination']}, Date = {$examinee_data['exam_date']}, Status = {$examinee_data['status']}, Uploaded = {$examinee_data['upload_timestamp']}"
-                        );
-                    } else {
-                        $failed_count++;
-                    }
-                } else {
-                    $failed_count++;
-                }
-            }
-            
-            $pdo->commit();
-            
-            logActivity(
-                $pdo,
-                $_SESSION['user_id'] ?? null,
-                $_SESSION['full_name'] ?? $accountName,
-                'bulk_release_summary',
-                "Bulk release completed - Success: {$success_count}, Failed: {$failed_count}"
-            );
-            
-            $_SESSION['release_message'] = "Bulk release completed: {$success_count} successful, {$failed_count} failed";
-            $_SESSION['release_status'] = $failed_count > 0 ? 'warning' : 'success';
-            
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            
-            logActivity(
-                $pdo,
-                $_SESSION['user_id'] ?? null,
-                $_SESSION['full_name'] ?? $accountName,
-                'bulk_release_failed',
-                "Bulk release failed - Error: " . $e->getMessage()
-            );
-            
-            $_SESSION['release_message'] = "Bulk release failed: " . $e->getMessage();
-            $_SESSION['release_status'] = 'error';
-        }
-        
-        header("Location: " . $_SERVER['PHP_SELF'] . "?examination=" . urlencode($_GET['examination'] ?? '') . "&search_name=" . urlencode($_GET['search_name'] ?? ''));
-        exit();
-    }
-}
-
-// Fetch examination list
-$sql = "SELECT DISTINCT examination FROM rts_data_onhold ORDER BY upload_timestamp DESC";
-$result = $pdo->query($sql);
-$examinations = $result ? $result->fetchAll(PDO::FETCH_COLUMN) : [];
-
-// Fetch examination counts
-$sql_counts = "SELECT examination, COUNT(*) as count FROM rts_data_onhold GROUP BY examination";
-$result_counts = $pdo->query($sql_counts);
-$exam_counts = [];
-$total_count = 0;
-if ($result_counts) {
-    foreach ($result_counts->fetchAll(PDO::FETCH_ASSOC) as $row) {
-        $exam_counts[$row['examination']] = $row['count'];
-        $total_count += $row['count'];
-    }
-}
-
-// Fetch data based on filters
-$exam = isset($_GET['examination']) ? trim($_GET['examination']) : '';
-$search_name = isset($_GET['search_name']) ? trim($_GET['search_name']) : '';
-$data = [];
-
-if ($exam !== '') {
-    $sql_data = "SELECT id, name, examination, exam_date, upload_timestamp, status 
-                 FROM rts_data_onhold 
-                 WHERE LOWER(examination) = LOWER(?)";
-    $params = [$exam];
-
-    if ($search_name !== '') {
-        $sql_data .= " AND name LIKE ?";
-        $params[] = "%$search_name%";
-    }
-
-    $sql_data .= " ORDER BY upload_timestamp DESC";
-
-    $stmt = $pdo->prepare($sql_data);
-    $stmt->execute($params);
-    $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -224,283 +236,12 @@ if ($exam !== '') {
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body {
-            background: #f8f9fa;
-            font-family: "Century Gothic";
-            margin: 0;
-            padding: 0;
-        }
-
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            width: 280px;
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
-            color: white;
-            z-index: 1000;
-            transition: all 0.3s ease;
-        }
-        
-        .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .sidebar-brand {
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-decoration: none;
-            color: white;
-        }
-        
-        .sidebar-brand:hover {
-            color: white;
-        }
-        
-        .user-info {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-        
-        .user-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 10px;
-            font-size: 1.5rem;
-        }
-        
-      .user-avatar-sm {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: rgba(134, 65, 244, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-        }
-        
-        .nav-menu {
-            padding: 20px 0;
-        }
-        
-        .nav-item {
-            margin-bottom: 5px;
-        }
-        
-        .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 12px 20px;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            width: 100%;
-            text-align: left;
-        }
-        
-        .nav-link:hover {
-            background: rgba(255,255,255,0.1);
-            color: white;
-        }
-        
-        .nav-link.active {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border-right: 3px solid white;
-        }
-        
-        .nav-link i {
-            width: 20px;
-            margin-right: 10px;
-        }
-        
-        .main-content {
-            margin-left: 280px;
-            margin-right: 320px;
-            min-height: 100vh;
-            padding: 30px;
-        }
-        
-        .right-panel {
-            position: fixed;
-            top: 0;
-            right: 0;
-            height: 100vh;
-            width: 320px;
-            background: white;
-            border-left: 1px solid #e9ecef;
-            z-index: 999;
-            overflow-y: auto;
-            padding: 30px 20px;
-        }
-        
-        .dashboard-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border: none;
-            margin-bottom: 20px;
-        }
-        
-        .page-header {
-            margin-bottom: 30px;
-        }
-        
-        .page-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2c3e50;
-        }
-
-        .summary-card {
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
-            color: white;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 30px;
-        }
-
-        .stat-card {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 15px;
-        }
-        
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        
-        .stat-label {
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-
-        .filter-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-            padding: 25px;
-            margin-bottom: 30px;
-        }
-
-        .form-control, .form-select {
-            border-radius: 10px;
-            border: 2px solid #e9ecef;
-            padding: 12px 15px;
-            font-family: "Century Gothic";
-        }
-
-        .form-control:focus, .form-select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
-            border: none;
-            border-radius: 10px;
-            padding: 12px 25px;
-            font-family: "Century Gothic";
-            font-weight: 600;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
-            transform: translateY(-1px);
-        }
-
-        .table {
-            border-radius: 15px;
-            overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-        }
-
-      
-
-        .table td {
-            padding: 15px;
-            border-color: #e9ecef;
-            font-family: "Century Gothic";
-        }
-
-        .table tbody tr:hover {
-            background-color: #f8f9fa;
-        }
-
-        .exam-count-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-        
-        .exam-count-name {
-            font-weight: 500;
-            font-size: 0.9rem;
-            color: #495057;
-        }
-        
-        .exam-count-badge {
-            background: #4285f4;
-            color: white;
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-
-        /* Content section styling */
-        .content-section {
-            display: none;
-        }
-        
-        .content-section.active {
-            display: block;
-        }
-
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-            
-            .sidebar.mobile-open {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 0;
-                margin-right: 0;
-            }
-            
-            .right-panel {
-                display: none;
-            }
-        }
-    </style>
+     <link href="staff_rts_view.css" rel="stylesheet">
+    
 </head>
 <body>
-      <?php include 'staff_panel.php'; ?>
+    <?php include 'admin_panel.php'; ?>
 
-    
     <!-- Right Side Panel for Summary -->
     <div class="right-panel">
         <h5 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Summary of RTS Data</h5>
@@ -543,36 +284,52 @@ if ($exam !== '') {
                 unset($_SESSION['release_status']); 
                 ?>
             <?php endif; ?>
-        
 
-        <!-- Filter Card -->
+
+         <!-- Filter Card -->
         <div class="filter-card">
             <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
-            <form method="get" action="" id="filterForm">
-                <div class="row align-items-end">
-                    <div class="col-md-4">
-                        <label for="examSelect" class="form-label"><i class="fas fa-graduation-cap me-1"></i>Select Examination</label>
-                        <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
-                            <option value="">-- Choose an examination --</option>
-                            <?php foreach ($examinations as $examination): ?>
-                                <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($examination) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4">
-                        <label for="searchName" class="form-label"><i class="fas fa-search me-1"></i>Search Name</label>
-                        <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
-                    </div>
-                    <div class="col-md-4">
-                        <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-2"></i>Search</button>
-                    </div>
-                </div>
+
+        <!-- SEARCH FORM -->
+        <form method="get" action="" id="filterForm">
+        <div class="row align-items-end">
+            <div class="col-md-4">
+                <label for="examSelect" class="form-label">
+                <i class="fas fa-graduation-cap me-1"></i>Select Examination
+                </label>
+            <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
+                <option value="">-- Choose an examination --</option>
+                <?php foreach ($examinations as $examination): ?>
+                <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($examination) ?>
+                </option>
+                <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="searchName" class="form-label">
+                <i class="fas fa-search me-1"></i>Search Name
+                </label>
+                <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">
+                    <i class="fas fa-search me-2"></i>Search
+                </button>
+                <button type="button" class="btn btn-success flex-fill" onclick="submitExportForm()">
+                    <i class="fas fa-file-excel me-1"></i>Export
+                </button>
+            </div>
+            </div>
             </form>
+
+         <form method="post" action="export_rtsData.php" id="exportForm" style="display:none;">
+        <input type="hidden" name="exam" id="exportExam">
+        <input type="hidden" name="search_name" id="exportSearch">
+        </form>
         </div>
-        
-        <div class="d-flex justify-content-end mb-2">
+
+         <div class="d-flex justify-content-end mb-2">
         <label class="me-2">Show 
         <select id="rowsPerPageSelect" class="form-select d-inline-block w-auto">
             <option value="20" selected>20</option>
@@ -584,82 +341,369 @@ if ($exam !== '') {
 
         <!-- Data Table -->
         <?php if (!empty($data)): ?>
-            <div class="dashboard-card">
-                <div class="card-header bg-transparent">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-list me-2"></i>RTS Data for: <?= htmlspecialchars($exam) ?>
-                        <span class="badge bg-primary ms-2"><?= count($data) ?> records</span>
-                    </h5>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead>
-                                
-                                <tr>
-                                    <tr class="paginated-row">
-                                    <th><i class="fas fa-hashtag me-1"></i>ID</th>
-                                    <th><i class="fas fa-user me-1"></i>Name</th>
-                                    <th><i class="fas fa-graduation-cap me-1"></i>Examination</th>
-                                    <th><i class="fas fa-calendar me-1"></i>Exam Date</th>
-                                    <th><i class="fas fa-clock me-1"></i>Upload Timestamp</th>
-                                    <th><i class="fas fa-info-circle me-1"></i>Status</th>
-                                    <th><i class="fas fa-cog me-1"></i>Action</th> 
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($data as $row): ?>
-                                    <tr>
-                                        <td><strong><?= htmlspecialchars($row['id']) ?></strong></td>
-                                        <td><?= htmlspecialchars($row['name']) ?></td>
-                                        <td>
-                                            <span class="badge bg-info"><?= htmlspecialchars($row['examination']) ?></span>
-                                        </td>
-                                        <td><?= htmlspecialchars($row['exam_date']) ?></td>
-                                        <td>
-                                            <small class="text-muted">
-                                                <?= htmlspecialchars(date("M d, Y", strtotime($row['upload_timestamp']))) ?><br>
-                                                <?= htmlspecialchars(date("h:i A", strtotime($row['upload_timestamp']))) ?>
-                                            </small>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-warning"><?= htmlspecialchars($row['status']) ?></span>
-                                        </td>
-                                        <td>
-                                            <form method="post" action="" class="d-inline" onsubmit="return confirm('Are you sure you want to release (delete) this record?');">
-                                                <input type="hidden" name="release_id" value="<?= htmlspecialchars($row['id']) ?>">
-                                                <button type="submit" class="btn btn-danger btn-sm">
-                                                    <i class="fas fa-unlock me-1"></i>Release
-                                                </button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+            <!-- Bulk Actions -->
+            <div class="bulk-actions">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="selectAll">
+                            <label class="form-check-label fw-medium" for="selectAll">
+                                Select All Records
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-warning" onclick="bulkRelease()" disabled id="bulkReleaseBtn">
+                            <i class="fas fa-trash-alt me-2"></i>Release Selected
+                        </button>
                     </div>
                 </div>
             </div>
+
+            <div class="card dashboard-card">
+                <div class="card-header bg-transparent">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>RTS Data Records</h5>
+                        </div>
+                        <div class="col-auto">
+                            <span class="badge bg-info"><?= count($data) ?> records found</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <form id="bulkForm" method="post" action="">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <tr class="paginated-row">
+                                        <th width="50"><input type="checkbox" id="selectAllTable" class="form-check-input"></th>
+                                        <th><i class="fas fa-hashtag me-1"></i>ID</th>
+                                        <th><i class="fas fa-user me-1"></i>Name</th>
+                                        <th><i class="fas fa-file-alt me-1"></i>Examination</th>
+                                        <th><i class="fas fa-calendar me-1"></i>Exam Date</th>
+                                        <th><i class="fas fa-upload me-1"></i>Upload Timestamp</th>
+                                        <th><i class="fas fa-info-circle me-1"></i>Status</th>
+                                        <th><i class="fas fa-cog me-1"></i>Action</th>
+                                        <tr class="paginated-row">
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($data as $row): ?>
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" name="selected_records[]" value="<?= htmlspecialchars($row['id']) ?>" class="form-check-input record-checkbox">
+                                            </td>
+                                            <td><?= htmlspecialchars($row['id']) ?></td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
+                                                    <span class="fw-medium"><?= htmlspecialchars($row['name']) ?></span>
+                                                </div>
+                                            </td>
+                                            <td><?= htmlspecialchars($row['examination']) ?></td>
+                                            <td>
+                                                <i class="fas fa-calendar-alt me-1 text-muted"></i>
+                                                <?= htmlspecialchars($row['exam_date']) ?>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-clock me-1"></i>
+                                                    <?= htmlspecialchars(date("M-d-Y H:i:s", strtotime($row['upload_timestamp']))) ?>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success">
+                                                    <?= htmlspecialchars($row['status']) ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn btn-danger btn-sm" 
+                                                        onclick="showReleaseConfirmation(<?= htmlspecialchars($row['id']) ?>, '<?= htmlspecialchars(addslashes($row['name'])) ?>', '<?= htmlspecialchars(addslashes($row['examination'])) ?>')">
+                                                    <i class="fas fa-trash me-1"></i>Release
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+                </div>
+            </div>
         <?php elseif ($exam !== ''): ?>
-            <div class="dashboard-card">
+            <div class="card dashboard-card">
                 <div class="card-body text-center py-5">
-                    <i class="fas fa-search fa-4x text-muted mb-3"></i>
-                    <h5 class="text-muted">No Records Found</h5>
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No records found</h5>
                     <p class="text-muted">No records found for examination: <strong><?= htmlspecialchars($exam) ?></strong></p>
-                    <?php if ($search_name !== ''): ?>
-                        <p class="text-muted">with name containing: <strong><?= htmlspecialchars($search_name) ?></strong></p>
-                    <?php endif; ?>
                 </div>
             </div>
         <?php endif; ?>
     </div>
 
+    <!-- Hidden form for individual releases -->
+    <form id="releaseForm" method="post" action="" style="display: none;">
+        <input type="hidden" name="release_id" id="releaseId">
+        <input type="hidden" name="examinee_name" id="examineeName">
+        <input type="hidden" name="examination" id="examinationName">
+    </form>
+        
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        //Pagination
+       // Navigation functionality
+document.querySelectorAll('.nav-link[data-section]').forEach(link => {
+    link.addEventListener('click', function(e) {
+        e.preventDefault();
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        this.classList.add('active');
+        document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+        document.getElementById(this.getAttribute('data-section')).classList.add('active');
+    });
+});
 
-       document.addEventListener('DOMContentLoaded', function () {
+document.querySelectorAll('button[data-section]').forEach(button => {
+    button.addEventListener('click', function() {
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        const targetSection = this.getAttribute('data-section');
+        document.querySelector(`.nav-link[data-section="${targetSection}"]`).classList.add('active');
+        document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+        document.getElementById(targetSection).classList.add('active');
+    });
+});
+
+// Activity log filtering
+if (document.getElementById('activityFilter')) {
+    document.getElementById('activityFilter').addEventListener('change', function() {
+        const filter = this.value;
+        document.querySelectorAll('.activity-row').forEach(row => {
+            row.style.display = (filter === 'all' || row.getAttribute('data-action') === filter) ? '' : 'none';
+        });
+    });
+}
+
+// Enhanced confirmation function for individual releases
+function confirmRelease(examineeName) {
+    return confirm(`Are you sure you want to release (delete) the record for "${examineeName}"?\n\nThis action cannot be undone.`);
+}
+
+// Enhanced checkbox functionality with proper synchronization
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllMain = document.getElementById('selectAll');
+    const selectAllTable = document.getElementById('selectAllTable');
+    const recordCheckboxes = document.querySelectorAll('.record-checkbox');
+    const bulkReleaseBtn = document.getElementById('bulkReleaseBtn');
+
+    // Function to update bulk release button state
+    function updateBulkReleaseButton() {
+        const checkedBoxes = document.querySelectorAll('.record-checkbox:checked');
+        if (bulkReleaseBtn) {
+            bulkReleaseBtn.disabled = checkedBoxes.length === 0;
+        }
+        console.log(`${checkedBoxes.length} checkboxes selected`); // Debug log
+    }
+
+    // Function to update select all checkboxes based on individual selections
+    function updateSelectAllState() {
+        const totalCheckboxes = recordCheckboxes.length;
+        const checkedCheckboxes = document.querySelectorAll('.record-checkbox:checked').length;
+        
+        const allChecked = totalCheckboxes > 0 && checkedCheckboxes === totalCheckboxes;
+        
+        if (selectAllMain) selectAllMain.checked = allChecked;
+        if (selectAllTable) selectAllTable.checked = allChecked;
+    }
+
+    // Select all main functionality
+    if (selectAllMain) {
+        selectAllMain.addEventListener('change', function() {
+            console.log('Main select all clicked:', this.checked); // Debug log
+            recordCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            if (selectAllTable) selectAllTable.checked = this.checked;
+            updateBulkReleaseButton();
+        });
+    }
+
+    // Select all table functionality
+    if (selectAllTable) {
+        selectAllTable.addEventListener('change', function() {
+            console.log('Table select all clicked:', this.checked); // Debug log
+            recordCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            if (selectAllMain) selectAllMain.checked = this.checked;
+            updateBulkReleaseButton();
+        });
+    }
+
+    // Individual checkbox functionality
+    recordCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            console.log('Individual checkbox clicked:', this.value, this.checked); // Debug log
+            updateSelectAllState();
+            updateBulkReleaseButton();
+        });
+    });
+
+    // Initialize button state
+    updateBulkReleaseButton();
+});
+
+// Enhanced bulk release functionality with better error handling
+function bulkRelease() {
+    const checkedBoxes = document.querySelectorAll('.record-checkbox:checked');
+    
+    console.log('Bulk release triggered, selected boxes:', checkedBoxes.length); // Debug log
+    
+    if (checkedBoxes.length === 0) {
+        alert('Please select at least one record to release.');
+        return;
+    }
+
+    // Get selected record details for confirmation
+    const selectedRecords = [];
+    checkedBoxes.forEach(checkbox => {
+        const row = checkbox.closest('tr');
+        const nameElement = row.querySelector('td:nth-child(3) span');
+        const examElement = row.querySelector('td:nth-child(4)');
+        
+        if (nameElement && examElement) {
+            const name = nameElement.textContent.trim();
+            const examination = examElement.textContent.trim();
+            selectedRecords.push({
+                id: checkbox.value,
+                name: name,
+                examination: examination
+            });
+        }
+    });
+
+    console.log('Selected records:', selectedRecords); // Debug log
+
+    // Check if Bootstrap modal exists, use it; otherwise use confirm dialog
+    const modal = document.getElementById('confirmReleaseModal');
+    if (modal) {
+        showBulkReleaseModal(selectedRecords, checkedBoxes);
+    } else {
+        // Fallback to confirm dialog
+        const confirmMessage = `Are you sure you want to release ${selectedRecords.length} record(s)?\n\nThis action cannot be undone.\n\nRecords to be released:\n${selectedRecords.slice(0, 5).map(r => `- ${r.name} (${r.examination})`).join('\n')}${selectedRecords.length > 5 ? `\n... and ${selectedRecords.length - 5} more` : ''}`;
+        
+        if (confirm(confirmMessage)) {
+            submitBulkReleaseForm(checkedBoxes);
+        }
+    }
+}
+
+// Enhanced modal function with better UI
+function showBulkReleaseModal(selectedRecords, checkedBoxes) {
+    const modal = new bootstrap.Modal(document.getElementById('confirmReleaseModal'));
+    const content = document.getElementById('releaseConfirmationContent');
+    
+    let html = `<div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>${selectedRecords.length}</strong> record(s) selected for release:
+    </div>
+    <div class="list-group" style="max-height: 200px; overflow-y: auto;">`;
+    
+    selectedRecords.slice(0, 10).forEach(record => {
+        html += `<div class="list-group-item">
+            <strong>${record.name}</strong><br>
+            <small class="text-muted">${record.examination}</small>
+        </div>`;
+    });
+    
+    if (selectedRecords.length > 10) {
+        html += `<div class="list-group-item text-center text-muted">
+            ... and ${selectedRecords.length - 10} more record(s)
+        </div>`;
+    }
+    
+    html += '</div>';
+    content.innerHTML = html;
+    
+    // Set up confirm button
+    document.getElementById('confirmReleaseBtn').onclick = function() {
+        modal.hide();
+        submitBulkReleaseForm(checkedBoxes);
+    };
+    
+    modal.show();
+}
+
+// Enhanced form submission with better error handling
+function submitBulkReleaseForm(checkedBoxes) {
+    // Use the existing bulkForm if available
+    const bulkForm = document.getElementById('bulkForm');
+    if (bulkForm) {
+        // Add bulk release input
+        const bulkInput = document.createElement('input');
+        bulkInput.type = 'hidden';
+        bulkInput.name = 'bulk_release';
+        bulkInput.value = '1';
+        bulkForm.appendChild(bulkInput);
+        
+        console.log('Submitting bulk form with', checkedBoxes.length, 'selected records'); // Debug log
+        bulkForm.submit();
+    } else {
+        console.error('Bulk form not found'); // Debug log
+        // Fallback: create new form
+        createAndSubmitBulkForm(checkedBoxes);
+    }
+}
+
+// Fallback function to create form if bulkForm doesn't exist
+function createAndSubmitBulkForm(checkedBoxes) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.style.display = 'none';
+    
+    // Add bulk release indicator
+    const bulkInput = document.createElement('input');
+    bulkInput.type = 'hidden';
+    bulkInput.name = 'bulk_release';
+    bulkInput.value = '1';
+    form.appendChild(bulkInput);
+    
+    // Add selected record IDs
+    checkedBoxes.forEach(checkbox => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selected_records[]';
+        input.value = checkbox.value;
+        form.appendChild(input);
+        console.log('Added checkbox value to form:', checkbox.value); // Debug log
+    });
+    
+    document.body.appendChild(form);
+    console.log('Submitting fallback form'); // Debug log
+    form.submit();
+}
+
+// Auto-hide alerts after 5 seconds
+setTimeout(function() {
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(alert => {
+        if (alert.classList.contains('alert-dismissible')) {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }
+    });
+}, 5000);
+
+// Export form submission
+function submitExportForm() {
+    // Copy values from the visible form
+    document.getElementById('exportExam').value = document.getElementById('examSelect').value;
+    document.getElementById('exportSearch').value = document.getElementById('searchName').value;
+    document.getElementById('exportForm').submit();
+}
+
+// Enhanced Pagination with better error handling
+document.addEventListener('DOMContentLoaded', function () {
     // Get table body rows (excluding header)
     const tableBody = document.querySelector('tbody');
     if (!tableBody) return; // Exit if no table body found
@@ -698,7 +742,7 @@ if ($exam !== '') {
     const nextBtn = document.getElementById('nextPage');
     
     let currentPage = 1;
-    let rowsPerPage = parseInt(rowsPerPageSelect.value);
+    let rowsPerPage = parseInt(rowsPerPageSelect?.value || 10);
     let totalPages = Math.ceil(rows.length / rowsPerPage);
 
     function showPage(page) {
@@ -729,6 +773,8 @@ if ($exam !== '') {
         // Update button states
         if (prevBtn) prevBtn.disabled = page === 1;
         if (nextBtn) nextBtn.disabled = page === totalPages || rows.length === 0;
+        
+        console.log(`Displaying page ${page} of ${totalPages}`); // Debug log
     }
 
     // Event listeners
@@ -756,6 +802,7 @@ if ($exam !== '') {
             currentPage = 1; // Reset to first page
             totalPages = Math.ceil(rows.length / rowsPerPage);
             showPage(currentPage);
+            console.log(`Rows per page changed to: ${rowsPerPage}`); // Debug log
         });
     }
 
@@ -772,6 +819,7 @@ if ($exam !== '') {
         const newRows = tableBody.querySelectorAll('tr');
         if (newRows.length !== rows.length) {
             // Rows have changed, reinitialize
+            console.log('Table rows changed, reinitializing pagination'); // Debug log
             location.reload(); // Simple approach, or you could update the rows variable
         }
     });
