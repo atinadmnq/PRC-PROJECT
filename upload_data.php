@@ -176,18 +176,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         $rows = $worksheet->toArray();
 
         $recordsInserted = 0;
+        $skippedRows = 0;
         $inserted_ids = [];
 
         for ($i = 3; $i < count($rows); $i++) {
             $data = $rows[$i];
 
-            // Trim values first
-            $name = isset($data[1]) ? trim($data[1]) : '';
-            $raw_exam = isset($data[2]) ? trim($data[2]) : '';
-            $exam_date = isset($data[3]) ? trim($data[3]) : '';
+            // Skip completely empty rows
+            if (empty(trim($data[0])) && empty(trim($data[1])) && empty(trim($data[2])) && empty(trim($data[3]))) {
+                continue;
+            }
 
-            // Skip rows where any required field is empty or just whitespace
-            if ($name === '' || $raw_exam === '' || $exam_date === '') {
+            $name = trim($data[1] ?? '');
+            $raw_exam = trim($data[2] ?? '');
+            $exam_date = trim($data[3] ?? '');
+
+            // Skip if any required field is blank
+            if (empty($name) || empty($raw_exam) || empty($exam_date)) {
+                $skippedRows++;
                 continue;
             }
 
@@ -208,11 +214,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         if ($recordsInserted > 0) {
             logRORUpload($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', $fileName, $recordsInserted);
             $_SESSION["message"] = "Excel file uploaded successfully! {$recordsInserted} records processed.";
+            if ($skippedRows > 0) {
+                $_SESSION["message"] .= " {$skippedRows} rows skipped due to missing data.";
+            }
             $_SESSION["last_upload_timestamp"] = $upload_timestamp;
             $_SESSION["last_upload_ids"] = $inserted_ids;
         } else {
-            logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - No records inserted");
-            $_SESSION["error"] = "No valid records found to insert.";
+            $_SESSION["error"] = "No records inserted.";
+            if ($skippedRows > 0) {
+                $_SESSION["error"] .= " All rows skipped due to missing data.";
+            }
+            logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - Error: No records processed");
         }
 
     } catch (Exception $e) {
