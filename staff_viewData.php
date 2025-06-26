@@ -1,4 +1,3 @@
-<!-- staff_viewData.php -->
 <?php
 session_start();
 require_once 'activity_logger.php';
@@ -109,6 +108,8 @@ if (isset($_POST['bulk_release'])) {
     if (!empty($selected_ids)) {
         $success_count = 0;
         $failed_count = 0;
+        $released_names = [];
+        $examination_name = '';
         
         try {
             $pdo->beginTransaction();
@@ -121,9 +122,15 @@ if (isset($_POST['bulk_release'])) {
                 $examinee_data = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if ($examinee_data) {
+                    // Capture examination name (all should be the same in bulk release)
+                    if (empty($examination_name)) {
+                        $examination_name = $examinee_data['examination'];
+                    }
+                    
                     $delete_stmt = $pdo->prepare("DELETE FROM roravailable WHERE id = ?");
                     if ($delete_stmt->execute([$id])) {
                         $success_count++;
+                        $released_names[] = $examinee_data['name'];
                         
                         logReleaseActivity(
                             $pdo,
@@ -143,12 +150,15 @@ if (isset($_POST['bulk_release'])) {
             
             $pdo->commit();
             
-            logActivity(
+            // Use the new logBulkReleaseSummary function with examination name
+            logBulkReleaseSummary(
                 $pdo,
                 $_SESSION['user_id'] ?? null,
                 $_SESSION['full_name'] ?? $accountName,
-                'bulk_release_summary',
-                "Bulk release completed - Success: {$success_count}, Failed: {$failed_count}"
+                $success_count,
+                $failed_count,
+                $released_names,
+                $examination_name
             );
             
             $_SESSION['release_message'] = "Bulk release completed: {$success_count} successful, {$failed_count} failed";
@@ -235,239 +245,12 @@ try {
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-         body {
-            background: #f8f9fa;
-            font-family: "Century Gothic";
-            margin: 0;
-            padding: 0;
-        }
-        
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 100vh;
-            width: 280px;
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
-            color: white;
-            z-index: 1000;
-            transition: all 0.3s ease;
-        }
-        
-        .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .sidebar-brand {
-            font-size: 1.5rem;
-            font-weight: 700;
-            text-decoration: none;
-            color: white;
-        }
-        
-        .sidebar-brand:hover {
-            color: white;
-        }
-        
-        .user-info {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            text-align: center;
-        }
-        
-        .user-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 10px;
-            font-size: 1.5rem;
-        }
-        
-        .user-avatar-sm {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: rgba(134, 65, 244, 0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-        }
-        
-        .nav-menu {
-            padding: 20px 0;
-        }
-        
-        .nav-item {
-            margin-bottom: 5px;
-        }
-        
-        .nav-link {
-            color: rgba(255,255,255,0.8);
-            padding: 12px 20px;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-            border: none;
-            background: none;
-            width: 100%;
-            text-align: left;
-        }
-        
-        .nav-link:hover {
-            background: rgba(255,255,255,0.1);
-            color: white;
-        }
-        
-        .nav-link.active {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border-right: 3px solid white;
-        }
-        
-        .nav-link i {
-            width: 20px;
-            margin-right: 10px;
-        }
-        
-        .main-content {
-            margin-left: 280px;
-            margin-right: 320px;
-            min-height: 100vh;
-            padding: 30px;
-        }
-        
-        .right-panel {
-            position: fixed;
-            top: 0;
-            right: 0;
-            height: 100vh;
-            width: 320px;
-            background: white;
-            border-left: 1px solid #e9ecef;
-            z-index: 999;
-            overflow-y: auto;
-            padding: 30px 20px;
-        }
-        
-        .content-section {
-            display: none;
-        }
-        
-        .content-section.active {
-            display: block;
-        }
-        
-        .dashboard-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            border: none;
-            margin-bottom: 20px;
-        }
-        
-        .page-header {
-            margin-bottom: 30px;
-        }
-        
-        .page-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #2c3e50;
-        }
-        
-        .stat-card {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 15px;
-        }
-        
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 5px;
-        }
-        
-        .stat-label {
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-        
-        .exam-count-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-        
-        .exam-count-name {
-            font-weight: 500;
-            font-size: 0.9rem;
-            color: #495057;
-        }
-        
-        .exam-count-badge {
-            background: #4285f4;
-            color: white;
-            padding: 4px 10px;
-            border-radius: 15px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-
-        /* Updated Filter Card Styles (from RTS view) */
-        .filter-card {
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-            padding: 25px;
-            margin-bottom: 30px;
-        }
-
-        .form-control, .form-select {
-            border-radius: 10px;
-            border: 2px solid #e9ecef;
-            padding: 12px 15px;
-            font-family: "Century Gothic";
-        }
-
-        .form-control:focus, .form-select:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
-            border: none;
-            border-radius: 10px;
-            padding: 12px 25px;
-            font-family: "Century Gothic";
-            font-weight: 600;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);
-            transform: translateY(-1px);
-        }
-        </style>
-
+     <link href="css/staff_viewData.css" rel="stylesheet">
    
 </head>
 <body>
-   <?php include 'staff_panel.php'; ?>
-
+    <?php include 'admin_panel.php'; ?>
+    
     <!-- Right Side Panel for Summary -->
     <div class="right-panel">
         <h5 class="mb-3"><i class="fas fa-chart-bar me-2"></i>Summary of Uploaded Data</h5>
@@ -486,7 +269,7 @@ try {
         <?php endforeach; ?>
     </div>
     
-   <div class="main-content">
+    <div class="main-content">
         <!-- Main ROR Data View Section -->
         <div id="ror-data" class="content-section active">
             <div class="page-header">
@@ -506,34 +289,46 @@ try {
                 unset($_SESSION['release_status']); 
                 ?>
             <?php endif; ?>
-            <!-- Filter Card  -->
-            <div class="filter-card">
-                <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
-                <form method="get" action="" id="filterForm">
-                    <div class="row align-items-end">
-                        <div class="col-md-4">
-                            <label for="examSelect" class="form-label"><i class="fas fa-graduation-cap me-1"></i>Select Examination</label>
-                            <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
-                                <option value="">-- Choose an examination --</option>
-                                <?php foreach ($examinations as $examination): ?>
-                                    <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($examination) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="searchName" class="form-label"><i class="fas fa-search me-1"></i>Search Name</label>
-                            <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search me-2"></i>Search</button>
-                        </div>
-                        
-                </form>
+
+           
+        <!-- Filter Card -->
+        <div class="filter-card">
+            <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
+
+        <!-- SEARCH FORM -->
+        <form method="get" action="" id="filterForm">
+        <div class="row align-items-end">
+            <div class="col-md-4">
+                <label for="examSelect" class="form-label">
+                <i class="fas fa-graduation-cap me-1"></i>Select Examination
+                </label>
+            <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
+                <option value="">-- Choose an examination --</option>
+                <?php foreach ($examinations as $examination): ?>
+                <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($examination) ?>
+                </option>
+                <?php endforeach; ?>
+                </select>
             </div>
-            
-             <form method="post" action="export_rtsData.php" id="exportForm" style="display:none;">
+            <div class="col-md-4">
+                <label for="searchName" class="form-label">
+                <i class="fas fa-search me-1"></i>Search Name
+                </label>
+                <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">
+                    <i class="fas fa-search me-2"></i>Search
+                </button>
+                <button type="button" class="btn btn-success flex-fill" onclick="submitExportForm()">
+                    <i class="fas fa-file-excel me-1"></i>Export
+                </button>
+            </div>
+            </div>
+            </form>
+
+       <form method="post" action="export_rtsData.php" id="exportForm" style="display:none;">
         <input type="hidden" name="exam" id="exportExam">
         <input type="hidden" name="search_name" id="exportSearch">
         </form>
@@ -551,6 +346,25 @@ try {
 
             <!-- Data Table Card -->
             <?php if (!empty($data)): ?>
+            <!-- Bulk Actions -->
+            <div class="bulk-actions">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="selectAll">
+                            <label class="form-check-label fw-medium" for="selectAll">
+                                Select All Records
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-warning" onclick="bulkRelease()" disabled id="bulkReleaseBtn">
+                            <i class="fas fa-trash-alt me-2"></i>Release Selected
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="card dashboard-card">
                 <div class="card-header bg-transparent">
                     <div class="row align-items-center">
@@ -563,59 +377,62 @@ try {
                     </div>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <tr class="paginated-row">
-                                    <th><i class="fas fa-hashtag me-1"></i>ID</th>
-                                    <th><i class="fas fa-user me-1"></i>Name</th>
-                                    <th><i class="fas fa-file-alt me-1"></i>Examination</th>
-                                    <th><i class="fas fa-calendar me-1"></i>Exam Date</th>
-                                    <th><i class="fas fa-upload me-1"></i>Upload Timestamp</th>
-                                    <th><i class="fas fa-info-circle me-1"></i>Status</th>
-                                    <th><i class="fas fa-cog me-1"></i>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($data as $row): ?>
+                    <form id="bulkForm" method="post" action="">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
                                     <tr>
-                                        <td><?= htmlspecialchars($row['id']) ?></td>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
-                                                <span class="fw-medium"><?= htmlspecialchars($row['name']) ?></span>
-                                            </div>
-                                        </td>
-                                        <td><?= htmlspecialchars($row['examination']) ?></td>
-                                        <td>
-                                            <i class="fas fa-calendar-alt me-1 text-muted"></i>
-                                            <?= htmlspecialchars($row['exam_date']) ?>
-                                        </td>
-                                        <td>
-                                            <small class="text-muted">
-                                                <i class="fas fa-clock me-1"></i>
-                                                <?= htmlspecialchars(date("M-d-Y H:i:s", strtotime($row['upload_timestamp']))) ?>
-                                            </small>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-success">
-                                                <?= htmlspecialchars($row['status']) ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <form method="post" action="" onsubmit="return confirm('Are you sure you want to release (delete) this record?');" class="d-inline">
-                                                <input type="hidden" name="release_id" value="<?= htmlspecialchars($row['id']) ?>">
-                                                <button type="submit" class="btn btn-danger btn-sm">
+                                        <th width="50"><input type="checkbox" id="selectAllTable" class="form-check-input"></th>
+                                        <th><i class="fas fa-hashtag me-1"></i>ID</th>
+                                        <th><i class="fas fa-user me-1"></i>Name</th>
+                                        <th><i class="fas fa-file-alt me-1"></i>Examination</th>
+                                        <th><i class="fas fa-calendar me-1"></i>Exam Date</th>
+                                        <th><i class="fas fa-upload me-1"></i>Upload Timestamp</th>
+                                        <th><i class="fas fa-info-circle me-1"></i>Status</th>
+                                        <th><i class="fas fa-cog me-1"></i>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($data as $row): ?>
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" name="selected_records[]" value="<?= htmlspecialchars($row['id']) ?>" class="form-check-input record-checkbox">
+                                            </td>
+                                            <td><?= htmlspecialchars($row['id']) ?></td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
+                                                    <span class="fw-medium"><?= htmlspecialchars($row['name']) ?></span>
+                                                </div>
+                                            </td>
+                                            <td><?= htmlspecialchars($row['examination']) ?></td>
+                                            <td>
+                                                <i class="fas fa-calendar-alt me-1 text-muted"></i>
+                                                <?= htmlspecialchars($row['exam_date']) ?>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    <i class="fas fa-clock me-1"></i>
+                                                    <?= htmlspecialchars(date("M-d-Y H:i:s", strtotime($row['upload_timestamp']))) ?>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success">
+                                                    <?= htmlspecialchars($row['status']) ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button type="button" class="btn btn-danger btn-sm" 
+                                                        onclick="showReleaseConfirmation(<?= htmlspecialchars($row['id']) ?>, '<?= htmlspecialchars(addslashes($row['name'])) ?>', '<?= htmlspecialchars(addslashes($row['examination'])) ?>')">
                                                     <i class="fas fa-trash me-1"></i>Release
                                                 </button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
                 </div>
             </div>
             <?php elseif ($exam !== ''): ?>
@@ -628,391 +445,19 @@ try {
             </div>
             <?php endif; ?>
         </div>
-
-        <!-- Activity Log Section -->
-        <div id="activity" class="content-section">
-            <div class="page-header">
-                <h1 class="page-title"><i class="fas fa-history me-3"></i>Activity Log</h1>
-                <p class="text-muted">Monitor all system activities and user actions</p>
-            </div>
-
-            <div class="card dashboard-card">
-                <div class="card-header bg-transparent">
-                    <div class="row align-items-center">
-                        <div class="col">
-                            <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>Recent Activities</h5>
-                        </div>
-                        <div class="col-auto">
-                            <select class="form-select form-select-sm" id="activityFilter">
-                                <option value="all">All Activities</option>
-                                <option value="login">Login Activities</option>
-                                <option value="logout">Logout Activities</option>
-                                <option value="create">Create Activities</option>
-                                <option value="update">Update Activities</option>
-                                <option value="delete">Delete Activities</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th><i class="fas fa-user me-1"></i>User</th>
-                                    <th><i class="fas fa-cog me-1"></i>Action</th>
-                                    <th><i class="fas fa-info-circle me-1"></i>Description</th>
-                                    <th><i class="fas fa-clock me-1"></i>Date & Time</th>
-                                </tr>
-                            </thead>
-                            <tbody id="activityTableBody">
-                                <?php if (!empty($activity_logs)): ?>
-                                    <?php foreach ($activity_logs as $log): ?>
-                                    <tr class="activity-row" data-action="<?php echo $log['action'] ?? ''; ?>">
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="user-avatar-sm me-2"><i class="fas fa-user"></i></div>
-                                                <div>
-                                                    <div class="fw-medium"><?php echo htmlspecialchars($log['full_name'] ?? 'Unknown User'); ?></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-<?php 
-                                                echo ($log['action'] ?? '') == 'login' ? 'success' : 
-                                                    (($log['action'] ?? '') == 'logout' ? 'danger' : 
-                                                    (($log['action'] ?? '') == 'create' ? 'primary' : 
-                                                    (($log['action'] ?? '') == 'update' ? 'warning' : 
-                                                    (($log['action'] ?? '') == 'delete' ? 'danger' : 'secondary')))); 
-                                            ?>">
-                                                <i class="fas fa-<?php 
-                                                    echo ($log['action'] ?? '') == 'login' ? 'sign-in-alt' : 
-                                                        (($log['action'] ?? '') == 'logout' ? 'sign-out-alt' : 
-                                                        (($log['action'] ?? '') == 'create' ? 'plus' : 
-                                                        (($log['action'] ?? '') == 'update' ? 'edit' : 
-                                                        (($log['action'] ?? '') == 'delete' ? 'trash' : 'info-circle')))); 
-                                                ?> me-1"></i><?php echo ucfirst($log['action'] ?? 'Unknown'); ?>
-                                            </span>
-                                        </td>
-                                        <td><?php echo htmlspecialchars($log['description'] ?? 'No description available'); ?></td>
-                                        <td>
-                                            <small class="text-muted">
-                                                <i class="fas fa-calendar me-1"></i><?php echo isset($log['created_at']) ? date('M j, Y', strtotime($log['created_at'])) : 'Unknown date'; ?><br>
-                                                <i class="fas fa-clock me-1"></i><?php echo isset($log['created_at']) ? date('g:i A', strtotime($log['created_at'])) : 'Unknown time'; ?>
-                                            </small>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <tr>
-                                        <td colspan="4" class="text-center text-muted py-4">
-                                            <i class="fas fa-info-circle me-2"></i>No activity logs available
-                                        </td>
-                                    </tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
+    <!-- Hidden form for individual releases -->
+    <form id="releaseForm" method="post" action="" style="display: none;">
+        <input type="hidden" name="release_id" id="releaseId">
+        <input type="hidden" name="examinee_name" id="examineeName">
+        <input type="hidden" name="examination" id="examinationName">
+    </form>
+
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Navigation functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            const navLinks = document.querySelectorAll('.nav-link[data-section]');
-            const contentSections = document.querySelectorAll('.content-section');
-
-            navLinks.forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    
-                    const targetSection = this.getAttribute('data-section');
-                    
-                    // Remove active class from all nav links
-                    navLinks.forEach(nl => nl.classList.remove('active'));
-                    
-                    // Add active class to clicked nav link
-                    this.classList.add('active');
-                    
-                    // Hide all content sections
-                    contentSections.forEach(section => section.classList.remove('active'));
-                    
-                    // Show target section
-                    const targetElement = document.getElementById(targetSection);
-                    if (targetElement) {
-                        targetElement.classList.add('active');
-                    }
-                });
-            });
-
-            // Activity log filtering functionality - updated to match staff_dashboard.php
-            const activityFilter = document.getElementById('activityFilter');
-            if (activityFilter) {
-                activityFilter.addEventListener('change', function() {
-                    const filter = this.value;
-                    const activityRows = document.querySelectorAll('.activity-row');
-                    
-                    activityRows.forEach(row => {
-                        const rowAction = row.getAttribute('data-action');
-                        
-                        // Show row if filter is 'all' or matches the row's action
-                        if (filter === 'all' || rowAction === filter) {
-                            row.style.display = '';
-                        } else {
-                            row.style.display = 'none';
-                        }
-                    });
-                });
-            }
-        });
-
-        
-        //Pagination
-
-       document.addEventListener('DOMContentLoaded', function () {
-    // Get table body rows (excluding header)
-    const tableBody = document.querySelector('tbody');
-    if (!tableBody) return; // Exit if no table body found
-    
-    const rows = tableBody.querySelectorAll('tr');
-    const rowsPerPageSelect = document.getElementById('rowsPerPageSelect');
-    
-    // Create pagination controls if they don't exist
-    let paginationContainer = document.getElementById('paginationContainer');
-    if (!paginationContainer) {
-        // Create pagination container
-        paginationContainer = document.createElement('div');
-        paginationContainer.id = 'paginationContainer';
-        paginationContainer.className = 'd-flex justify-content-between align-items-center mt-3';
-        paginationContainer.innerHTML = `
-            <div id="pageInfo" class="text-muted">Page 1 of 1</div>
-            <div id="paginationControls" class="d-flex align-items-center gap-2">
-                <button id="prevPage" class="btn btn-outline-secondary btn-sm" disabled>
-                    <i class="fas fa-chevron-left"></i> Previous
-                </button>
-                <button id="nextPage" class="btn btn-outline-secondary btn-sm">
-                    Next <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-        `;
-        
-        // Insert pagination container after the table card
-        const tableCard = document.querySelector('.table-responsive').closest('.card');
-        if (tableCard) {
-            tableCard.parentNode.insertBefore(paginationContainer, tableCard.nextSibling);
-        }
-    }
-    
-    const pageInfo = document.getElementById('pageInfo');
-    const prevBtn = document.getElementById('prevPage');
-    const nextBtn = document.getElementById('nextPage');
-    
-    let currentPage = 1;
-    let rowsPerPage = parseInt(rowsPerPageSelect.value);
-    let totalPages = Math.ceil(rows.length / rowsPerPage);
-
-    function showPage(page) {
-        const start = (page - 1) * rowsPerPage;
-        const end = start + rowsPerPage;
-
-        rows.forEach((row, index) => {
-            if (index >= start && index < end) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
-
-        totalPages = Math.ceil(rows.length / rowsPerPage);
-        
-        // Update page info
-        if (pageInfo) {
-            if (rows.length === 0) {
-                pageInfo.textContent = 'No records to display';
-            } else {
-                const displayStart = start + 1;
-                const displayEnd = Math.min(end, rows.length);
-                pageInfo.textContent = `Showing ${displayStart}-${displayEnd} of ${rows.length} entries`;
-            }
-        }
-        
-        // Update button states
-        if (prevBtn) prevBtn.disabled = page === 1;
-        if (nextBtn) nextBtn.disabled = page === totalPages || rows.length === 0;
-    }
-
-    // Event listeners
-    if (prevBtn) {
-        prevBtn.addEventListener('click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                showPage(currentPage);
-            }
-        });
-    }
-
-    if (nextBtn) {
-        nextBtn.addEventListener('click', () => {
-            if (currentPage < totalPages) {
-                currentPage++;
-                showPage(currentPage);
-            }
-        });
-    }
-
-    if (rowsPerPageSelect) {
-        rowsPerPageSelect.addEventListener('change', () => {
-            rowsPerPage = parseInt(rowsPerPageSelect.value);
-            currentPage = 1; // Reset to first page
-            totalPages = Math.ceil(rows.length / rowsPerPage);
-            showPage(currentPage);
-        });
-    }
-
-    // Initial setup
-    if (rows.length > 0) {
-        showPage(currentPage);
-        if (paginationContainer) paginationContainer.style.display = 'flex';
-    } else {
-        if (paginationContainer) paginationContainer.style.display = 'none';
-    }
-
-    // Update pagination when filters change (for dynamic content)
-    const observer = new MutationObserver(() => {
-        const newRows = tableBody.querySelectorAll('tr');
-        if (newRows.length !== rows.length) {
-            // Rows have changed, reinitialize
-            location.reload(); // Simple approach, or you could update the rows variable
-        }
-    });
-
-    observer.observe(tableBody, { childList: true });
-});
-    
-     //Pagination
-
-       document.addEventListener('DOMContentLoaded', function () {
-    // Get table body rows (excluding header)
-    const tableBody = document.querySelector('tbody');
-    if (!tableBody) return; // Exit if no table body found
-    
-    const rows = tableBody.querySelectorAll('tr');
-    const rowsPerPageSelect = document.getElementById('rowsPerPageSelect');
-    
-    // Create pagination controls if they don't exist
-    let paginationContainer = document.getElementById('paginationContainer');
-    if (!paginationContainer) {
-        // Create pagination container
-        paginationContainer = document.createElement('div');
-        paginationContainer.id = 'paginationContainer';
-        paginationContainer.className = 'd-flex justify-content-between align-items-center mt-3';
-        paginationContainer.innerHTML = `
-            <div id="pageInfo" class="text-muted">Page 1 of 1</div>
-            <div id="paginationControls" class="d-flex align-items-center gap-2">
-                <button id="prevPage" class="btn btn-outline-secondary btn-sm" disabled>
-                    <i class="fas fa-chevron-left"></i> Previous
-                </button>
-                <button id="nextPage" class="btn btn-outline-secondary btn-sm">
-                    Next <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-        `;
-        
-        // Insert pagination container after the table card
-        const tableCard = document.querySelector('.table-responsive').closest('.card');
-        if (tableCard) {
-            tableCard.parentNode.insertBefore(paginationContainer, tableCard.nextSibling);
-        }
-    }
-    
-    const pageInfo = document.getElementById('pageInfo');
-    const prevBtn = document.getElementById('prevPage');
-    const nextBtn = document.getElementById('nextPage');
-    
-    let currentPage = 1;
-    let rowsPerPage = parseInt(rowsPerPageSelect.value);
-    let totalPages = Math.ceil(rows.length / rowsPerPage);
-
-    function showPage(page) {
-        const start = (page - 1) * rowsPerPage;
-        const end = start + rowsPerPage;
-
-        rows.forEach((row, index) => {
-            if (index >= start && index < end) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
-
-        totalPages = Math.ceil(rows.length / rowsPerPage);
-        
-        // Update page info
-        if (pageInfo) {
-            if (rows.length === 0) {
-                pageInfo.textContent = 'No records to display';
-            } else {
-                const displayStart = start + 1;
-                const displayEnd = Math.min(end, rows.length);
-                pageInfo.textContent = `Showing ${displayStart}-${displayEnd} of ${rows.length} entries`;
-            }
-        }
-        
-        // Update button states
-        if (prevBtn) prevBtn.disabled = page === 1;
-        if (nextBtn) nextBtn.disabled = page === totalPages || rows.length === 0;
-    }
-
-    // Event listeners
-    if (prevBtn) {
-        prevBtn.addEventListener('click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                showPage(currentPage);
-            }
-        });
-    }
-
-    if (nextBtn) {
-        nextBtn.addEventListener('click', () => {
-            if (currentPage < totalPages) {
-                currentPage++;
-                showPage(currentPage);
-            }
-        });
-    }
-
-    if (rowsPerPageSelect) {
-        rowsPerPageSelect.addEventListener('change', () => {
-            rowsPerPage = parseInt(rowsPerPageSelect.value);
-            currentPage = 1; // Reset to first page
-            totalPages = Math.ceil(rows.length / rowsPerPage);
-            showPage(currentPage);
-        });
-    }
-
-    // Initial setup
-    if (rows.length > 0) {
-        showPage(currentPage);
-        if (paginationContainer) paginationContainer.style.display = 'flex';
-    } else {
-        if (paginationContainer) paginationContainer.style.display = 'none';
-    }
-
-    // Update pagination when filters change (for dynamic content)
-    const observer = new MutationObserver(() => {
-        const newRows = tableBody.querySelectorAll('tr');
-        if (newRows.length !== rows.length) {
-            // Rows have changed, reinitialize
-            location.reload(); // Simple approach, or you could update the rows variable
-        }
-    });
-
-    observer.observe(tableBody, { childList: true });
-});
+    <script src="staff_viewData.js">
+      
     </script>
 </body>
 </html>

@@ -176,18 +176,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         $recordsInserted = 0;
         $inserted_ids = [];
 
-        
         for ($i = 2; $i < count($rows); $i++) {
             $data = $rows[$i];
 
-            if (empty($data[0]) && empty($data[1]) && empty($data[2]) && empty($data[3])) {
+            // Trim values first
+            $name = isset($data[1]) ? trim($data[1]) : '';
+            $raw_exam = isset($data[2]) ? trim($data[2]) : '';
+            $exam_date = isset($data[3]) ? trim($data[3]) : '';
+
+            // Skip rows where any required field is empty or just whitespace
+            if ($name === '' || $raw_exam === '' || $exam_date === '') {
                 continue;
             }
 
-            $name = $data[1] ?? 'N/A';
-            $raw_exam = $data[2] ?? 'N/A';
             $examination = normalizeExamination($raw_exam);
-            $exam_date = $data[3] ?? 'N/A';
             $status = 'pending';
 
             $stmt = $conn->prepare("INSERT INTO rts_data_onhold (name, examination, exam_date, upload_timestamp, status) VALUES (?, ?, ?, ?, ?)");
@@ -208,7 +210,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
             $_SESSION["last_upload_ids"] = $inserted_ids;
         } else {
             logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_rts', "Failed to upload RTS file: {$fileName} - No records inserted");
-            $_SESSION["error"] = "No records inserted.";
+            $_SESSION["error"] = "No valid records found to insert.";
         }
 
     } catch (Exception $e) {

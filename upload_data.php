@@ -181,19 +181,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         for ($i = 3; $i < count($rows); $i++) {
             $data = $rows[$i];
 
-            // Skip rows where all required fields are empty or whitespace
-            if (
-                (!isset($data[1]) || trim($data[1]) === '') &&
-                (!isset($data[2]) || trim($data[2]) === '') &&
-                (!isset($data[3]) || trim($data[3]) === '')
-            ) {
+            // Trim values first
+            $name = isset($data[1]) ? trim($data[1]) : '';
+            $raw_exam = isset($data[2]) ? trim($data[2]) : '';
+            $exam_date = isset($data[3]) ? trim($data[3]) : '';
+
+            // Skip rows where any required field is empty or just whitespace
+            if ($name === '' || $raw_exam === '' || $exam_date === '') {
                 continue;
             }
 
-            $name = trim($data[1]) ?? 'N/A';
-            $raw_exam = trim($data[2]) ?? 'N/A';
             $examination = normalizeExamination($raw_exam);
-            $exam_date = trim($data[3]) ?? 'N/A';
             $status = 'pending';
 
             $stmt = $conn->prepare("INSERT INTO roravailable (name, examination, exam_date, upload_timestamp, status) VALUES (?, ?, ?, ?, ?)");
@@ -214,7 +212,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
             $_SESSION["last_upload_ids"] = $inserted_ids;
         } else {
             logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - No records inserted");
-            $_SESSION["error"] = "No records inserted.";
+            $_SESSION["error"] = "No valid records found to insert.";
         }
 
     } catch (Exception $e) {

@@ -47,7 +47,7 @@ function logUserCreation($pdo, $userId, $accountName, $newFullName, $newEmail, $
  * Logs individual release activity
  */
 function logReleaseActivity($pdo, $userId, $accountName, $clientName, $releaseType = 'individual', $additionalInfo = '', $releaseId = null) {
-    $description = "Released ROR ($releaseType)";
+    $description = "Released Data ($releaseType)";
     if (!empty($additionalInfo)) {
         $description .= " - $additionalInfo";
     }
@@ -55,10 +55,16 @@ function logReleaseActivity($pdo, $userId, $accountName, $clientName, $releaseTy
 }
 
 /**
- * Logs bulk release summary
+ * Logs bulk release summary with examination names
  */
-function logBulkReleaseSummary($pdo, $userId, $accountName, $successCount, $failedCount, $names = []) {
+function logBulkReleaseSummary($pdo, $userId, $accountName, $successCount, $failedCount, $names = [], $examinationName = '') {
     $description = "Bulk release completed - Success: $successCount, Failed: $failedCount";
+    
+    // Add examination name if provided
+    if (!empty($examinationName)) {
+        $description = "Bulk release for " . $examinationName . " - Success: $successCount, Failed: $failedCount";
+    }
+    
     if (!empty($names)) {
         $description .= " - Names: " . implode(", ", array_slice($names, 0, 10));
         if (count($names) > 10) {
