@@ -1,5 +1,5 @@
 <?php
-// Make sure session is started before including this file
+// Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -10,6 +10,12 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     exit();
 }
 
+// ✅ Enforce staff-only access
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'staff') {
+    // Redirect non-staff users (e.g., admin) to another page or show access denied
+    header("Location: unauthorized.php"); // You can change this to admin_dashboard.php if needed
+    exit();
+}
 
 // Handle logout
 if (isset($_GET['logout'])) {
@@ -41,8 +47,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <i class="fas fa-tachometer-alt"></i>Dashboard
                 </a>
             </li>
-            <li class="nav-item"><a href="account.php" class="nav-link"><i class="fas fa-user-cog"></i>Account Settings</a></li>
-
+            <li class="nav-item">
+                <a href="account.php" class="nav-link">
+                    <i class="fas fa-user-cog"></i>Account Settings
+                </a>
+            </li>
             <li class="nav-item">
                 <a href="activity_log.php" class="nav-link <?php echo $current_page == 'activity_log.php' ? 'active' : ''; ?>">
                     <i class="fas fa-history"></i>Activity Log
@@ -59,12 +68,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </a>
             </li>
             <li class="nav-item">
-                <a href="index.php" class="nav-link">
+                <a href="index.php?logout=true" class="nav-link">
                     <i class="fas fa-sign-out-alt"></i>Logout
                 </a>
             </li>
         </ul>
     </nav>
 </div>
-</body>
-</html>

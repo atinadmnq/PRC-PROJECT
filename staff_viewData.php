@@ -2,6 +2,7 @@
 session_start();
 require_once 'activity_logger.php';
 
+
 // Database connection
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'prc_release_db');
@@ -249,7 +250,7 @@ try {
    
 </head>
 <body>
-    <?php include 'admin_panel.php'; ?>
+    <?php include 'staff_panel.php'; ?>
     
     <!-- Right Side Panel for Summary -->
     <div class="right-panel">

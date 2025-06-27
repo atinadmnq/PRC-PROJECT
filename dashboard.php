@@ -305,8 +305,6 @@ if (!empty($recentActivities)) {
                                 <a href="rts_ui.php" class="btn btn-outline-primary">
                                     <i class="fas fa-upload me-2"></i>Upload RTS
                                 </a>
-                                <a href="" class="btn btn-outline-secondary">
-                                    <i class="fas fa-download me-2"></i>Export Data
                                 </a>
                             </div>
                         </div>

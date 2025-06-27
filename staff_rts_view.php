@@ -2,6 +2,7 @@
 session_start();
 require_once 'activity_logger.php';
 
+
 // Database connection
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'prc_release_db');
@@ -240,7 +241,7 @@ if (isset($_POST['release_id'])) {
     
 </head>
 <body>
-    <?php include 'admin_panel.php'; ?>
+    <?php include 'staff_panel.php'; ?>
 
     <!-- Right Side Panel for Summary -->
     <div class="right-panel">

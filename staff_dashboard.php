@@ -3,6 +3,7 @@
 session_start();
 require_once 'activity_logger.php'; 
 
+
 // Database connection
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'prc_release_db');
