@@ -128,7 +128,7 @@ try {
     
     // Generate filename
     $cleanExam = preg_replace('/[^a-zA-Z0-9_-]/', '_', $exam);
-    $filename = "ROR_Export_{$cleanExam}_" . date('Ymd_His') . ".xlsx";
+    $filename = "RTS_Export_{$cleanExam}_" . date('Ymd_His') . ".xlsx";
     
     // Create Excel writer
     $writer = new Xlsx($spreadsheet);
@@ -139,7 +139,7 @@ try {
         $userId,
         $accountName,
         'export_completed',
-        "Exported ROR data for examination: {$exam} - Total records: {$record_count}"
+        "Exported RTS data for examination: {$exam} - Total records: {$record_count}"
     );
     
     // Send headers for download

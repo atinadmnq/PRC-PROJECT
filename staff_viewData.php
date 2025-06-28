@@ -329,7 +329,7 @@ try {
             </div>
             </form>
 
-       <form method="post" action="export_rtsData.php" id="exportForm" style="display:none;">
+       <form method="post" action="export_rorData.php" id="exportForm" style="display:none;">
         <input type="hidden" name="exam" id="exportExam">
         <input type="hidden" name="search_name" id="exportSearch">
         </form>
@@ -457,8 +457,14 @@ try {
 
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="staff_viewData.js">
-      
-    </script>
+    <script src="staff_viewData.js"> 
+    
+    // Export form submission
+function submitExportForm() {
+    // Copy values from the visible form
+    document.getElementById('exportExam').value = document.getElementById('examSelect').value;
+    document.getElementById('exportSearch').value = document.getElementById('searchName').value;
+    document.getElementById('exportForm').submit();} </script>
+
 </body>
 </html>

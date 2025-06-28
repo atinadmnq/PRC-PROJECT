@@ -247,6 +247,7 @@ function submitExportForm() {
     document.getElementById('exportForm').submit();
 }
 
+
 // Enhanced Pagination with better error handling
 document.addEventListener('DOMContentLoaded', function () {
     // Get table body rows (excluding header)
