@@ -299,37 +299,44 @@ if (isset($_POST['release_id'])) {
             <h5 class="mb-3"><i class="fas fa-filter me-2"></i>Filter Data</h5>
 
         <!-- SEARCH FORM -->
-        <form method="get" action="" id="filterForm">
-        <div class="row align-items-end">
-            <div class="col-md-4">
-                <label for="examSelect" class="form-label">
+       <form method="get" action="" id="filterForm">
+    <div class="row align-items-end">
+        <div class="col-md-4">
+            <label for="examSelect" class="form-label">
                 <i class="fas fa-graduation-cap me-1"></i>Select Examination
-                </label>
+            </label>
             <select name="examination" id="examSelect" class="form-select" required onchange="document.getElementById('filterForm').submit()">
                 <option value="">-- Choose an examination --</option>
-                <?php foreach ($examinations as $examination): ?>
-                <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
-                <?= htmlspecialchars($examination) ?>
-                </option>
+                <?php
+                    $sortedExaminations = $examinations;
+                    sort($sortedExaminations, SORT_NATURAL | SORT_FLAG_CASE);
+                    foreach ($sortedExaminations as $examination):
+                ?>
+                    <option value="<?= htmlspecialchars($examination) ?>" <?= ($exam === $examination) ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($examination) ?>
+                    </option>
                 <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="col-md-4">
-                <label for="searchName" class="form-label">
+            </select>
+        </div>
+
+        <div class="col-md-4">
+            <label for="searchName" class="form-label">
                 <i class="fas fa-search me-1"></i>Search Name
-                </label>
-                <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
-            </div>
-            <div class="col-md-4 d-flex gap-2">
-                <button type="submit" class="btn btn-primary flex-fill">
-                    <i class="fas fa-search me-2"></i>Search
-                </button>
-                <button type="button" class="btn btn-success flex-fill" onclick="submitExportForm()">
-                    <i class="fas fa-file-excel me-1"></i>Export
-                </button>
-            </div>
-            </div>
-            </form>
+            </label>
+            <input type="text" id="searchName" name="search_name" class="form-control" placeholder="Enter name to search" value="<?= htmlspecialchars($search_name) ?>">
+        </div>
+
+        <div class="col-md-4 d-flex gap-2">
+            <button type="submit" class="btn btn-primary flex-fill">
+                <i class="fas fa-search me-2"></i>Search
+            </button>
+            <button type="button" class="btn btn-success flex-fill" onclick="submitExportForm()">
+                <i class="fas fa-file-excel me-1"></i>Export
+            </button>
+        </div>
+    </div>
+</form>
+
 
          <form method="post" action="export_rtsData.php" id="exportForm" style="display:none;">
         <input type="hidden" name="exam" id="exportExam">
