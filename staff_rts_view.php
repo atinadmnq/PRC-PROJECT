@@ -828,5 +828,32 @@ document.addEventListener('DOMContentLoaded', function () {
     observer.observe(tableBody, { childList: true });
 });
     </script>
+
+    <script>
+function showReleaseConfirmation(id, name, examination) {
+    if (confirm(`Are you sure you want to release "${name}" for "${examination}"? This action cannot be undone.`)) {
+        fetch('rts_release.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `id=${encodeURIComponent(id)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert("Data successfully released.");
+                location.reload(); 
+            } else {
+                alert(data.message || "An error occurred.");
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('A network error occurred.');
+        });
+    }
+}
+</script>
 </body>
 </html>
