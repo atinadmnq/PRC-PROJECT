@@ -174,7 +174,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         for ($i = 3; $i < count($rows); $i++) {
             $data = $rows[$i];
 
-            // Skip completely empty rows
             if (empty(trim($data[0])) && empty(trim($data[1])) && empty(trim($data[2])) && empty(trim($data[3]))) {
                 continue;
             }
@@ -183,7 +182,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
             $raw_exam = trim($data[2] ?? '');
             $exam_date = trim($data[3] ?? '');
 
-            // Skip if any required field is blank
             if (empty($name) || empty($raw_exam) || empty($exam_date)) {
                 $skippedRows++;
                 continue;
@@ -192,29 +190,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
             $examination = normalizeExamination($raw_exam);
             $status = 'pending';
 
-            $stmt = $conn->prepare("INSERT INTO rts_data_onhold (name, examination, exam_date, upload_timestamp, status) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("sssss", $name, $examination, $exam_date, $upload_timestamp, $status);
+            // Check for existing record with same name and examination
+            $checkStmt = $conn->prepare("SELECT id FROM rts_data_onhold WHERE name = ? AND examination = ?");
+            $checkStmt->bind_param("ss", $name, $examination);
+            $checkStmt->execute();
+            $checkStmt->store_result();
 
-            if ($stmt->execute()) {
-                $recordsInserted++;
-                $inserted_ids[] = $conn->insert_id;
+            if ($checkStmt->num_rows === 0) {
+                $checkStmt->close();
+
+                $stmt = $conn->prepare("INSERT INTO rts_data_onhold (name, examination, exam_date, upload_timestamp, status) VALUES (?, ?, ?, ?, ?)");
+                $stmt->bind_param("sssss", $name, $examination, $exam_date, $upload_timestamp, $status);
+
+                if ($stmt->execute()) {
+                    $recordsInserted++;
+                    $inserted_ids[] = $conn->insert_id;
+                }
+
+                $stmt->close();
+            } else {
+                $checkStmt->close();
+                $skippedRows++;
             }
-
-            $stmt->close();
         }
 
         if ($recordsInserted > 0) {
             logRTSUpload($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', $fileName, $recordsInserted);
             $_SESSION["message"] = "Excel file uploaded successfully! {$recordsInserted} records processed.";
             if ($skippedRows > 0) {
-                $_SESSION["message"] .= " {$skippedRows} rows skipped due to missing data.";
+                $_SESSION["message"] .= " {$skippedRows} duplicate/missing rows skipped.";
             }
             $_SESSION["last_upload_timestamp"] = $upload_timestamp;
             $_SESSION["last_upload_ids"] = $inserted_ids;
         } else {
             $_SESSION["error"] = "No records inserted.";
             if ($skippedRows > 0) {
-                $_SESSION["error"] .= " All rows skipped due to missing data.";
+                $_SESSION["error"] .= " All rows skipped due to missing data or duplicates.";
             }
             logActivity($conn, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_rts', "Failed to upload RTS file: {$fileName} - Error: No records processed");
         }

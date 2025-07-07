@@ -182,7 +182,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
         for ($i = 3; $i < count($rows); $i++) {
             $data = $rows[$i];
 
-            // Skip completely empty rows
             if (empty(trim($data[0])) && empty(trim($data[1])) && empty(trim($data[2])) && empty(trim($data[3]))) {
                 continue;
             }
@@ -191,7 +190,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
             $raw_exam = trim($data[2] ?? '');
             $exam_date = trim($data[3] ?? '');
 
-            // Skip if any required field is blank
             if (empty($name) || empty($raw_exam) || empty($exam_date)) {
                 $skippedRows++;
                 continue;
@@ -200,29 +198,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES["excel_file"])) {
             $examination = normalizeExamination($raw_exam);
             $status = 'pending';
 
-            $stmt = $conn->prepare("INSERT INTO roravailable (name, examination, exam_date, upload_timestamp, status) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("sssss", $name, $examination, $exam_date, $upload_timestamp, $status);
+            // Check for duplicate name + examination combo
+            $check_stmt = $conn->prepare("SELECT COUNT(*) FROM roravailable WHERE name = ? AND examination = ?");
+            $check_stmt->bind_param("ss", $name, $examination);
+            $check_stmt->execute();
+            $check_stmt->bind_result($count);
+            $check_stmt->fetch();
+            $check_stmt->close();
 
-            if ($stmt->execute()) {
-                $recordsInserted++;
-                $inserted_ids[] = $conn->insert_id;
+            if ($count == 0) {
+                // Not a duplicate, insert
+                $stmt = $conn->prepare("INSERT INTO roravailable (name, examination, exam_date, upload_timestamp, status) VALUES (?, ?, ?, ?, ?)");
+                $stmt->bind_param("sssss", $name, $examination, $exam_date, $upload_timestamp, $status);
+
+                if ($stmt->execute()) {
+                    $recordsInserted++;
+                    $inserted_ids[] = $conn->insert_id;
+                }
+                $stmt->close();
+            } else {
+                // Duplicate found
+                $skippedRows++;
             }
-
-            $stmt->close();
         }
 
         if ($recordsInserted > 0) {
             logRORUpload($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', $fileName, $recordsInserted);
             $_SESSION["message"] = "Excel file uploaded successfully! {$recordsInserted} records processed.";
             if ($skippedRows > 0) {
-                $_SESSION["message"] .= " {$skippedRows} rows skipped due to missing data.";
+                $_SESSION["message"] .= " {$skippedRows} rows skipped due to duplicates or missing data.";
             }
             $_SESSION["last_upload_timestamp"] = $upload_timestamp;
             $_SESSION["last_upload_ids"] = $inserted_ids;
         } else {
             $_SESSION["error"] = "No records inserted.";
             if ($skippedRows > 0) {
-                $_SESSION["error"] .= " All rows skipped due to missing data.";
+                $_SESSION["error"] .= " All rows skipped due to duplicates or missing data.";
             }
             logActivity($pdo, $_SESSION['user_id'] ?? null, $_SESSION['full_name'] ?? 'Unknown User', 'upload_ror', "Failed to upload ROR file: {$fileName} - Error: No records processed");
         }
