@@ -7,18 +7,27 @@ $dbname = "prc_release_db";
 $conn = new mysqli($host, $user, $pass, $dbname);
 if ($conn->connect_error) die("Connection failed: " . $conn->connect_error);
 $uploadSuccess = false;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['pdf_files'])) {
     $year = $_POST['year'];
+    $category = $_POST['category'];
     $uploadDir = "uploads/$year/";
+
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0777, true);
     }
-    $stmt = $conn->prepare("INSERT INTO pdf_files (file_name, file_path, year_folder) VALUES (?, ?, ?)");
+
+    $table = $category === 'mailed' ? 'pdf_mailed' : 'pdf_on_file';
+
+    $stmt = $conn->prepare("INSERT INTO $table (file_name, file_path, year_folder) VALUES (?, ?, ?)");
+
     foreach ($_FILES['pdf_files']['name'] as $index => $name) {
         $tmpName = $_FILES['pdf_files']['tmp_name'][$index];
+
         if ($_FILES['pdf_files']['error'][$index] === UPLOAD_ERR_OK) {
             $safeName = uniqid() . "_" . basename($name);
             $targetPath = $uploadDir . $safeName;
+
             if (move_uploaded_file($tmpName, $targetPath)) {
                 $stmt->bind_param("sss", $name, $targetPath, $year);
                 $stmt->execute();
@@ -26,8 +35,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['pdf_files'])) {
             }
         }
     }
+
     $stmt->close();
 }
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -319,7 +330,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['pdf_files'])) {
                                 <input type="number" class="form-control" id="year" name="year" 
                                        min="2000" max="2099" value="<?php echo date('Y'); ?>" required>
                             </div>
-                            
+
+                            <!-- Category Selection -->
+                            <div class="mb-4">
+                                <label for="category" class="form-label">
+                                <i class="fas fa-folder me-2"></i>Select Category
+                                </label>
+                            <select class="form-select" id="category" name="category" required>
+                            <option value="">-- Choose One --</option>
+                            <option value="mailed">Mailed</option>
+                            <option value="on_file">On File</option>
+                            </select>
+                            </div>
+
                             <!-- File Upload Zone -->
                             <div class="upload-zone" id="uploadZone">
                                 <div class="upload-icon">
