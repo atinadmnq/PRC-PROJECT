@@ -450,6 +450,7 @@ if ($selectedYear) {
                                                 <a href="<?= htmlspecialchars($row['file_path']) ?>" class="btn btn-primary btn-sm" target="_blank">
                                                     <i class="fas fa-eye me-1"></i>View
                                                 </a>
+                                                <div>
                                                 <form method="post" action="delete_pdf.php" style="display:inline;" onsubmit="return confirm('Are you sure?');">
                                                     <input type="hidden" name="id" value="<?= $row['id'] ?>">
                                                     <input type="hidden" name="category" value="<?= htmlspecialchars($selectedCategory) ?>">
@@ -457,6 +458,7 @@ if ($selectedYear) {
                                                 <i class="fas fa-trash me-1"></i>Delete
                                                     </button>
                                                 </form>
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>

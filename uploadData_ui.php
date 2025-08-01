@@ -297,7 +297,7 @@ require_once 'activity_logger.php';
     <div class="main-content">
         <div class="page-header">
             <h1 class="page-title"><i class="fas fa-upload me-3"></i>Upload ROR Excel File</h1>
-            <p class="text-muted">Upload your Roll of Registrants Excel file to the system</p>
+            <p class="text-muted">Upload your Report of Rating Excel file to the system</p>
         </div>
 
         <?php if (isset($_SESSION["message"])): ?>
