@@ -296,7 +296,7 @@ require_once 'activity_logger.php';
             <div class="card-body">
                 <div class="upload-container">
                     <!-- Horizontal Upload Form -->
-                    <form id="uploadForm" action="upload_data.php" method="POST" enctype="multipart/form-data" class="upload-form d-flex gap-3 align-items-end">
+                    <form id="uploadForm" action="user_upload_data.php" method="POST" enctype="multipart/form-data" class="upload-form d-flex gap-3 align-items-end">
                         <div class="flex-grow-1">
                             <label for="excel_file" class="form-label d-block">
                                 <i class="fas fa-file-excel"></i>
@@ -322,7 +322,7 @@ require_once 'activity_logger.php';
                         </ul>
                     </div>
 
-                    <a href="viewData.php" class="view-records-btn mt-4">
+                    <a href="user_view.php" class="view-records-btn mt-4">
                         <i class="fas fa-eye me-2"></i>
                         View Records
                     </a>

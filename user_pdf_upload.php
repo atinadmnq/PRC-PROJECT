@@ -1,5 +1,5 @@
 <?php
-include 'admin_panel.php';
+include 'user_panel.php';
 $host = "localhost";
 $user = "root";
 $pass = "";
@@ -387,12 +387,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['pdf_files'])) {
                     </div>
                     <div class="card-body">
                         <div class="d-grid gap-2">
-                            <form action="pdf_view.php" method="get">
+                            <form action="user_pdf_view.php" method="get">
                                 <button type="submit" class="btn btn-outline-primary w-100">
                                     <i class="fas fa-folder-open me-2"></i>View Uploaded Files
                                 </button>
                             </form>
-                            <a href="dashboard.php" class="btn btn-outline-secondary">
+                            <a href="user_dashboard.php" class="btn btn-outline-secondary">
                                 <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
                             </a>
                         </div>

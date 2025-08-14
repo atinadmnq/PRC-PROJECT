@@ -296,6 +296,7 @@ function getRoleBadgeInfo($role) {
                 <li class="nav-item"><a href="activity_log.php" class="nav-link"><i class="fas fa-history"></i>Activity Log</a></li>
                 <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload ROR Data</a></li>
                 <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload RTS Data</a></li>
+                <li class="nav-item"><a href="upload_pdf.php" class="nav-link"><i class="fas fa-upload"></i>Upload Scanned ROR</a></li>
                 <li class="nav-item"><a href="?logout=1" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
             </ul>
         </nav>

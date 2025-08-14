@@ -270,10 +270,10 @@ if (!empty($recentActivities)) {
                         </div>
                         <div class="card-body">
                             <div class="d-grid gap-2">
-                                <a href="uploadData_ui.php" class="btn btn-outline-primary">
+                                <a href="user_ror_upload.php" class="btn btn-outline-primary">
                                     <i class="fas fa-upload me-2"></i>Upload ROR
                                 </a>
-                                <a href="rts_ui.php" class="btn btn-outline-primary">
+                                <a href="user_rts_upload.php" class="btn btn-outline-primary">
                                     <i class="fas fa-upload me-2"></i>Upload RTS
                                 </a>
                             </div>
