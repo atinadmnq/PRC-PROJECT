@@ -237,6 +237,19 @@ if (isset($_POST['release_id'])) {
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <?php
+    // Load role-specific CSS based on user role
+    if (isset($_SESSION['role'])) {
+        $userRole = strtolower(trim($_SESSION['role']));
+        
+        if ($userRole === 'admin') {
+            echo '<link href="css/dashboard.css" rel="stylesheet">';
+        } elseif ($userRole === 'manager') {
+            echo '<link href="css/user_rts_view.css" rel="stylesheet">';
+        }
+    }
+    ?>
     <link href="css/rtsTableView.css" rel="stylesheet">
     <style>
         body {
@@ -248,7 +261,31 @@ if (isset($_POST['release_id'])) {
     </style>
 </head>
 <body>
-    <?php include 'admin_panel.php'; ?>
+      <?php
+    // CONDITIONAL PANEL INCLUDE - UPDATED TO INCLUDE MANAGER AND STAFF
+    if (isset($_SESSION['role'])) {
+        $userRole = strtolower(trim($_SESSION['role']));
+        
+        if ($userRole === 'admin') {
+            if (file_exists('admin_panel.php')) {
+                include 'admin_panel.php';
+            } else {
+                echo "<!-- Admin panel file not found -->";
+            }
+        } elseif ($userRole === 'manager') {
+            if (file_exists('user_panel.php')) {
+                include 'user_panel.php';
+            } else {
+                echo "<!-- Manager panel file not found -->";
+            }
+        } else {
+            echo "<!-- Unknown role: " . htmlspecialchars($_SESSION['role']) . " -->";
+        }
+    } else {
+        echo "<!-- No role set in session -->";
+        // Fallback - you might want to include a default panel or redirect
+    }
+    ?>
 
     <!-- Right Side Panel for Summary -->
     <div class="right-panel">

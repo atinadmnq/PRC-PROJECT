@@ -38,7 +38,6 @@ if (isset($_GET['logout'])) {
     exit();
 }
 
-
 // Function to get recent activities - FIXED VERSION
 function getRecentActivities($pdo, $limit = 3) {
     try {
@@ -151,7 +150,7 @@ if (!empty($recentActivities)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
+    <title>Manager Dashboard</title>
     <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -177,7 +176,7 @@ if (!empty($recentActivities)) {
         <div id="dashboard" class="content-section active">
             <div class="page-header">
                 <h1 class="page-title">
-                    <i class="fas fa-tachometer-alt me-3" id="fonty"></i>Dashboard Overview
+                    <i class="fas fa-tachometer-alt me-3" id="fonty"></i>Manager Dashboard Overview
                 </h1>
                 <p class="text-muted">Report of Rating Issuance Logistics and Inventory System</p>
             </div>
@@ -277,13 +276,13 @@ if (!empty($recentActivities)) {
                                 <a href="rts_ui.php" class="btn btn-outline-primary">
                                     <i class="fas fa-upload me-2"></i>Upload RTS
                                 </a>
-                                </a>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

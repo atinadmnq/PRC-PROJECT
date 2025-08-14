@@ -40,10 +40,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
                 logLoginActivity($pdo, $user['id'], $user['full_name'], true);
                 
                 // Redirect based on role
-                if ($user['role'] == 'admin') {
+                  if ($user['role'] == 'admin') {
                     header("Location: dashboard.php");
                 } else if ($user['role'] == 'staff') {
                     header("Location: staff_dashboard.php");
+                } else if ($user['role'] == 'manager') {
+                    header("Location: user_dashboard.php");  
                 } else {
                     header("Location: dashboard.php");
                 }

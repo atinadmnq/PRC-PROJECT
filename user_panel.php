@@ -3,14 +3,12 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-
 // Check if user is logged in
 if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
     header("Location: index.php");
     exit();
 }
 ?>
-
 <!-- Sidebar -->
 <div class="sidebar">
     <div class="sidebar-header">
@@ -19,7 +17,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
             RILIS
         </a>
     </div>
-    
+   
     <div class="user-info">
         <div class="user-avatar">
             <i class="fas fa-user"></i>
@@ -28,16 +26,16 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
             <?php echo htmlspecialchars($_SESSION['full_name'] ?? $_SESSION['email'] ?? 'User'); ?>
         </div>
         <small class="text-light"><?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?></small>
-        <small class="text-light">User</small>
+        <small class="text-light">Manager</small>
     </div>
-    
+   
     <nav class="nav-menu">
-        <ul class="list-unstyled"> 
+        <ul class="list-unstyled">
             <li class="nav-item"><a href="user_dashboard.php" class="nav-link"><i class="fas fa-tachometer-alt"></i>Dashboard</a></li>
             <li class="nav-item"><a href="account.php" class="nav-link"><i class="fas fa-user-cog"></i>Account Settings</a></li>
-            <li class="nav-item"><a href="uploadData_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload ROR Data</a></li>
-            <li class="nav-item"><a href="rts_ui.php" class="nav-link"><i class="fas fa-upload"></i>Upload RTS Data</a></li>
-            <li class="nav-item"><a href="upload_pdf.php" class="nav-link"><i class="fas fa-upload"></i>Upload Scanned ROR</a></li>
+           <li class="nav-item"><a href="user_ror_upload.php" class="nav-link"><i class="fas fa-upload"></i>Upload ROR Data</a></li>
+            <li class="nav-item"><a href="user_rts_upload.php" class="nav-link"><i class="fas fa-upload"></i>Upload RTS Data</a></li>
+            <li class="nav-item"><a href="user_pdf_upload.php" class="nav-link"><i class="fas fa-upload"></i>Upload Scanned ROR</a></li>
             <li class="nav-item"><a href="index.php" class="nav-link"><i class="fas fa-sign-out-alt"></i>Logout</a></li>
         </ul>
     </nav>

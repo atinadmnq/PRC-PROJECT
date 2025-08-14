@@ -138,12 +138,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
    
      <?php
-    // Load role-specific CSS
+    // Load role-specific CSS - UPDATED TO INCLUDE MANAGER
     if (isset($_SESSION['role'])) {
-        if ($_SESSION['role'] === 'admin') {
+        $userRole = strtolower(trim($_SESSION['role']));
+        
+        if ($userRole === 'admin') {
             echo '<link href="css/dashboard.css" rel="stylesheet">';
-        } elseif ($_SESSION['role'] === 'staff') {
+        } elseif ($userRole === 'staff') {
             echo '<link href="css/staff_dashboard.css" rel="stylesheet">';
+        } elseif ($userRole === 'manager') {
+            echo '<link href="css/user_dashboard.css" rel="stylesheet">';
         }
     }
     ?>
@@ -225,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
 <body>
    
    <?php
-    // IMPROVED CONDITIONAL PANEL INCLUDE
+    // IMPROVED CONDITIONAL PANEL INCLUDE - UPDATED TO INCLUDE MANAGER
     if (isset($_SESSION['role'])) {
         $userRole = strtolower(trim($_SESSION['role']));
         
@@ -240,6 +244,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
                 include 'staff_panel.php';
             } else {
                 echo "<!-- Staff panel file not found -->";
+            }
+        } elseif ($userRole === 'manager') {
+            if (file_exists('user_panel.php')) {
+                include 'user_panel.php';
+            } else {
+                echo "<!-- Manager panel file not found -->";
             }
         } else {
             echo "<!-- Unknown role: " . htmlspecialchars($_SESSION['role']) . " -->";
@@ -288,7 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
             <p class="mb-0 opacity-75"><?php echo htmlspecialchars($user_data['email']); ?></p>
             <small class="opacity-75">
                 <?php 
-                    // Display role based on user type
+                    // Display role based on user type - UPDATED TO INCLUDE MANAGER
                     if (isset($user_data['role'])) {
                         switch(strtolower($user_data['role'])) {
                             case 'admin':
@@ -297,18 +307,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
                             case 'staff':
                                 echo 'Staff Member';
                                 break;
+                            case 'manager':
+                                echo 'Manager Account';
+                                break;
                             default:
                                 echo ucfirst($user_data['role']) . ' Account';
                                 break;
                         }
                     } elseif (isset($user_data['user_type'])) {
-                        // Alternative field name for user type
+                        // Alternative field name for user type - UPDATED TO INCLUDE MANAGER
                         switch(strtolower($user_data['user_type'])) {
                             case 'admin':
                                 echo 'Administrator Account';
                                 break;
                             case 'staff':
                                 echo 'Staff Member';
+                                break;
+                            case 'manager':
+                                echo 'Manager Account';
                                 break;
                             default:
                                 echo ucfirst($user_data['user_type']) . ' Account';

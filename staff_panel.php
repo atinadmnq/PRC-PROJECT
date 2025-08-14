@@ -53,11 +53,6 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 </a>
             </li>
             <li class="nav-item">
-                <a href="activity_log.php" class="nav-link <?php echo $current_page == 'activity_log.php' ? 'active' : ''; ?>">
-                    <i class="fas fa-history"></i>Activity Log
-                </a>
-            </li>
-            <li class="nav-item">
                 <a href="staff_rts_view.php" class="nav-link <?php echo $current_page == 'staff_rts_view.php' ? 'active' : ''; ?>">
                     <i class="fas fa-table"></i>RTS Table View
                 </a>

@@ -114,7 +114,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_user'])) {
     $password = $_POST['password'];
     $role = $_POST['role'];
     
-    if (!empty($full_name) && !empty($email) && !empty($password) && !empty($role)) {
+    // Validate role options
+    $valid_roles = ['admin', 'manager', 'staff'];
+    
+    if (!empty($full_name) && !empty($email) && !empty($password) && in_array($role, $valid_roles)) {
         // Check if email already exists
         $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
         $stmt->execute([$email]);
@@ -173,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['register_user'])) {
             );
         }
     } else {
-        $_SESSION['reg_error'] = "Please fill in all fields.";
+        $_SESSION['reg_error'] = "Please fill in all fields with valid data.";
     }
 }
 
@@ -185,6 +188,19 @@ try {
 } catch (PDOException $e) {
     $all_users = [];
     error_log("Users fetch query failed: " . $e->getMessage());
+}
+
+// Function to get role badge class and icon
+function getRoleBadgeInfo($role) {
+    switch ($role) {
+        case 'admin':
+            return ['class' => 'bg-danger', 'icon' => 'crown'];
+        case 'manager':
+            return ['class' => 'bg-warning', 'icon' => 'user-tie'];
+        case 'staff':
+        default:
+            return ['class' => 'bg-info', 'icon' => 'user'];
+    }
 }
 ?>
 
@@ -242,6 +258,12 @@ try {
             color: #2c3e50;
             font-weight: 600;
             margin-bottom: 0.5rem;
+        }
+        
+        .role-description {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
         }
     </style>
 </head>
@@ -373,8 +395,14 @@ try {
                                 <select class="form-select" id="role" name="role" required>
                                     <option value="">Select Role</option>
                                     <option value="admin">Administrator</option>
+                                    <option value="manager">Manager</option>
                                     <option value="staff">Staff Member</option>
                                 </select>
+                                <div class="form-text">
+                                    <div id="roleDescription" class="role-description">
+                                        Select a role to see description
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -418,6 +446,7 @@ try {
                         <tbody>
                             <?php if (!empty($all_users)): ?>
                                 <?php foreach ($all_users as $user): ?>
+                                    <?php $roleBadge = getRoleBadgeInfo($user['role']); ?>
                                     <tr>
                                         <td>
                                             <div class="d-flex align-items-center">
@@ -437,8 +466,8 @@ try {
                                             </span>
                                         </td>
                                         <td>
-                                            <span class="badge bg-<?php echo $user['role'] == 'admin' ? 'danger' : 'info'; ?>">
-                                                <i class="fas fa-<?php echo $user['role'] == 'admin' ? 'crown' : 'user'; ?> me-1"></i>
+                                            <span class="badge <?php echo $roleBadge['class']; ?>">
+                                                <i class="fas fa-<?php echo $roleBadge['icon']; ?> me-1"></i>
                                                 <?php echo ucfirst($user['role']); ?>
                                             </span>
                                         </td>
@@ -518,6 +547,30 @@ try {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Role descriptions
+            const roleDescriptions = {
+                'admin': 'Full system access with all administrative privileges',
+                'manager': 'Supervisory access with management capabilities and reporting',
+                'staff': 'Standard user access with limited administrative functions'
+            };
+            
+            // Role selection handler
+            const roleSelect = document.getElementById('role');
+            const roleDescription = document.getElementById('roleDescription');
+            
+            if (roleSelect && roleDescription) {
+                roleSelect.addEventListener('change', function() {
+                    const selectedRole = this.value;
+                    if (selectedRole && roleDescriptions[selectedRole]) {
+                        roleDescription.textContent = roleDescriptions[selectedRole];
+                        roleDescription.className = 'role-description text-info';
+                    } else {
+                        roleDescription.textContent = 'Select a role to see description';
+                        roleDescription.className = 'role-description';
+                    }
+                });
+            }
+            
             // Password validation
             const passwordField = document.getElementById('password');
             const passwordHelp = document.getElementById('passwordHelp');
