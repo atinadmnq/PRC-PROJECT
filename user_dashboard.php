@@ -1,0 +1,293 @@
+<?php
+session_start();
+
+// Database configuration
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'prc_release_db');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+
+// Database connection
+try {
+    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    die("Database connection failed: " . $e->getMessage());
+}
+
+// Check if user is logged in
+if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
+    header("Location: index.php");
+    exit();
+}
+
+// Get user's full name if not set
+if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
+    $stmt = $pdo->prepare("SELECT full_name FROM users WHERE id = ?");
+    $stmt->execute([$_SESSION['user_id']]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($user) {
+        $_SESSION['full_name'] = $user['full_name'];
+    }
+}
+
+// Handle logout
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header("Location: index.php");
+    exit();
+}
+
+
+// Function to get recent activities - FIXED VERSION
+function getRecentActivities($pdo, $limit = 3) {
+    try {
+        $stmt = $pdo->prepare("
+            SELECT 
+                account_name,
+                activity_type,
+                description,
+                created_at
+            FROM activity_log 
+            ORDER BY created_at DESC 
+            LIMIT ?
+        ");
+        $stmt->bindValue(1, (int)$limit, PDO::PARAM_INT);
+        $stmt->execute();
+        $activities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $summary = [];
+        foreach ($activities as $activity) {
+            $summary[] = [
+                'summary' => $activity['account_name'] . " - " . $activity['description'] . " on " . date('M j, Y g:i A', strtotime($activity['created_at'])),
+                'action' => $activity['activity_type'] ?? 'unknown',
+                'created_at' => $activity['created_at']
+            ];
+        }
+
+        return $summary;
+    } catch (PDOException $e) {
+        error_log("Recent activities query failed: " . $e->getMessage());
+        return [];
+    }
+}
+
+// Initialize recentActivities with empty array as fallback
+$recentActivities = [];
+
+// Get recent activities for dashboard display
+try {
+    $recentActivities = getRecentActivities($pdo, 3);
+} catch (Exception $e) {
+    error_log("Error getting recent activities: " . $e->getMessage());
+    $recentActivities = []; // Ensure it's always an array
+}
+
+// Fetch activity logs for main display
+$activity_logs = [];
+try {
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            account_name,
+            activity_type,
+            description,
+            created_at,
+            ip_address
+        FROM activity_log 
+        ORDER BY created_at DESC 
+        LIMIT 50
+    ");
+    $stmt->execute();
+    $activity_logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Add compatibility fields
+    foreach ($activity_logs as &$log) {
+        $log['full_name'] = $log['account_name'] ?? 'Unknown User';
+        $log['action'] = $log['activity_type'] ?? 'unknown';
+    }
+} catch (PDOException $e) {
+    error_log("Activity log query failed: " . $e->getMessage());
+    $activity_logs = [];
+}
+
+// Get ROR count
+$ror_count = 0;
+try {
+    $sql_ror_count = "SELECT COUNT(*) as total_ror FROM roravailable";
+    $result_ror = $pdo->query($sql_ror_count);
+    if ($result_ror) {
+        $row_ror = $result_ror->fetch(PDO::FETCH_ASSOC);
+        $ror_count = $row_ror['total_ror'];
+    }
+} catch (PDOException $e) {
+    error_log("ROR count query failed: " . $e->getMessage());
+    $ror_count = 0;
+}
+
+// Get RTS count
+$rts_count = 0;
+try {
+    $sql_rts_count = "SELECT COUNT(*) as total_rts FROM rts_data_onhold";
+    $result_rts = $pdo->query($sql_rts_count);
+    if ($result_rts) {
+        $row_rts = $result_rts->fetch(PDO::FETCH_ASSOC);
+        $rts_count = $row_rts['total_rts'];
+    }
+} catch (PDOException $e) {
+    error_log("RTS count query failed: " . $e->getMessage());
+    $rts_count = 0;
+}
+
+// Debug output (remove this after testing)
+echo "<!-- DEBUG: Recent Activities Count: " . count($recentActivities) . " -->";
+if (!empty($recentActivities)) {
+    echo "<!-- DEBUG: First Activity: " . htmlspecialchars(print_r($recentActivities[0], true)) . " -->";
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link rel="icon" type="image/x-icon" href="img/rilis-logo.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="css/dashboard.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: "Century Gothic";
+            margin: 0;
+            padding: 0;
+        }
+        
+      
+    </style>
+</head>
+<body>
+    <?php include 'user_panel.php'; ?>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+               
+        <!-- Dashboard Section -->
+        <div id="dashboard" class="content-section active">
+            <div class="page-header">
+                <h1 class="page-title">
+                    <i class="fas fa-tachometer-alt me-3" id="fonty"></i>Dashboard Overview
+                </h1>
+                <p class="text-muted">Report of Rating Issuance Logistics and Inventory System</p>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card" style="background:linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);">
+                        <div class="mb-2">
+                            <i class="fas fa-file-alt fa-2x"></i>
+                        </div>
+                        <h3><?php echo number_format($rts_count); ?></h3>
+                        <p class="mb-0 fonty">Total RTS</p>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card" style="background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);">
+                        <div class="mb-2">
+                            <i class="fas fa-clock fa-2x"></i>
+                        </div>
+                        <h3><?php echo number_format($ror_count); ?></h3>
+                        <p class="mb-0 fonty">Total ROR</p>
+                    </div>
+                </div>
+                <!-- Add more stats cards if needed -->
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card" style="background: linear-gradient(135deg, rgb(41, 63, 161) 0%, rgb(49, 124, 210) 100%);">
+                        <div class="mb-2">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                        <h3><?php echo number_format($ror_count + $rts_count); ?></h3>
+                        <p class="mb-0 fonty">Total Records</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-8">
+                    <!-- Enhanced Recent Activities Section -->
+                    <div class="card dashboard-card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-clock me-2"></i>Recent Activities
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <?php if (!empty($recentActivities)): ?>
+                                <div class="activity-timeline">
+                                    <?php foreach ($recentActivities as $activity): ?>
+                                        <div class="activity-item" data-action="<?php echo htmlspecialchars($activity['action'] ?? ''); ?>">
+                                            <div class="activity-icon">
+                                                <i class="fas fa-<?php 
+                                                    $action = $activity['action'] ?? '';
+                                                    echo $action === 'login' ? 'sign-in-alt' : 
+                                                         ($action === 'logout' ? 'sign-out-alt' : 
+                                                         ($action === 'upload_ror' ? 'file-upload' : 
+                                                         ($action === 'upload_rts' ? 'cloud-upload-alt' : 'info-circle'))); 
+                                                ?>"></i>
+                                            </div>
+                                            <div class="activity-content">
+                                           <div class="activity-text">
+                                                    <?php echo htmlspecialchars($activity['summary']); ?>
+                                                </div>
+                                                <div class="activity-time">
+                                                    <?php echo isset($activity['created_at']) ? date('M j, Y g:i A', strtotime($activity['created_at'])) : 'Unknown time'; ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="text-center mt-3">
+                                    <a href="activity_log.php" class="btn btn-outline-primary btn-sm">
+                                        <i class="fas fa-list me-1"></i>View All Activities
+                                    </a>
+                                </div>
+                            <?php else: ?>
+                                <div class="text-center text-muted py-4">
+                                    <i class="fas fa-info-circle fa-2x mb-3"></i>
+                                    <p class="mb-0">No recent activities to display</p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card dashboard-card">
+                        <div class="card-header bg-transparent">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-chart-pie me-2"></i>Quick Actions
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="uploadData_ui.php" class="btn btn-outline-primary">
+                                    <i class="fas fa-upload me-2"></i>Upload ROR
+                                </a>
+                                <a href="rts_ui.php" class="btn btn-outline-primary">
+                                    <i class="fas fa-upload me-2"></i>Upload RTS
+                                </a>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/dashboard.js">
+    </script>
+</body>
+</html>

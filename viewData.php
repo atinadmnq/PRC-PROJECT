@@ -421,7 +421,7 @@ if ($exam !== '') {
                                             <td>
                                                 <button type="button" class="btn btn-danger btn-sm" 
                                                         onclick="showReleaseConfirmation(<?= htmlspecialchars($row['id']) ?>, '<?= htmlspecialchars(addslashes($row['name'])) ?>', '<?= htmlspecialchars(addslashes($row['examination'])) ?>')">
-                                                    <i class="fas fa-trash me-1"></i>Release
+                                                    <i class="fas"></i>Release
                                                 </button>
                                             </td>
                                         </tr>
