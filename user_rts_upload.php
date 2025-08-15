@@ -319,7 +319,7 @@ if (isset($_GET['logout'])) { session_destroy(); header("Location: index.php"); 
             <?php endif; ?>
 
             <!-- Horizontal Upload Form -->
-            <form id="uploadForm" action="user_rts_upload.php" method="POST" enctype="multipart/form-data" class="upload-form d-flex gap-3 align-items-end">
+            <form id="uploadForm" action="user_rtsDataUpload.php" method="POST" enctype="multipart/form-data" class="upload-form d-flex gap-3 align-items-end">
                 <div class="flex-grow-1">
                     <label for="excel_file" class="form-label d-block">
                         <i class="fas fa-file-excel"></i>
